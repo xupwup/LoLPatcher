@@ -1,1 +1,22 @@
 A league of legends patcher, see http://lolpatcher.xupwup.nl/
+
+
+How to build:
+- Build the Maestro project with netbeans and copy the jar from Maestro/dist/ to this project
+- build this project
+- get jarsplice
+- select all jars in dist/ and dist/lib/
+- select all natives in lwjgllib/
+- Main class = lolpatcher.Main
+- Build jar or exe
+
+Run jar with 
+$ java -jar filename.jar
+
+alternative:
+
+- Build the Maestro project with netbeans and copy the jar from Maestro/dist/ to this project
+- build this project
+- then run:
+
+$ java -Djava.library.path=lwjgllib -jar dist/LoLPatcher.jar
