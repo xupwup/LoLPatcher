@@ -179,6 +179,7 @@ public class ConfigurationTask extends PatchTask{
         main.patchers.add(new CopyTask(
                 new File("RiotRadsIO.dll"), 
                 new File("RADS/"), true));
+        
         main.patchers.add(new RunTask(new Runnable() {
             @Override
             public void run() {

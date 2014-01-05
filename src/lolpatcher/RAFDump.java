@@ -120,6 +120,7 @@ public class RAFDump {
      * Writes the .raf.dat file
      * @param filename
      * @param in
+     * @param patcher
      * @throws IOException 
      */
     public void writeFile(String filename, InputStream in, LoLPatcher patcher) throws IOException{
@@ -229,6 +230,7 @@ public class RAFDump {
         } catch (FileNotFoundException ex) {
             Logger.getLogger(RAFDump.class.getName()).log(Level.SEVERE, null, ex);
         }
+        out.close();
     }
     
     
