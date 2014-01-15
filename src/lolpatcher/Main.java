@@ -1,10 +1,5 @@
 package lolpatcher;
 
-/*
- * To change this template, choose Tools | Templates
- * and open the template in the editor.
- */
-
 import java.awt.Font;
 import java.awt.Point;
 import java.io.BufferedReader;
@@ -38,7 +33,7 @@ import static org.lwjgl.opengl.GL11.*;
  * @author Rick Hendricksen
  */
 public class Main extends GLFramework {
-    public static final int patcherVersion = 1;
+    public static final int patcherVersion = 2;
     public List<PatchTask> patchers;
     int currentPatcher = -1;
     PatchTask patcher;

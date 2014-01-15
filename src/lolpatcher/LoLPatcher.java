@@ -1,7 +1,3 @@
-/*
- * To change this template, choose Tools | Templates
- * and open the template in the editor.
- */
 package lolpatcher;
 
 import java.io.BufferedInputStream;
@@ -142,10 +138,32 @@ public class LoLPatcher extends PatchTask{
             for(RAFDump rd : archives.values()){
                 if(rd != null) rd.close();
             }
+            
+            managedFilesCleanup(mf);
+            
             new java.io.File("RADS/"+type + "/" + project + "/releases/"
                 + targetVersion + "/S_OK").createNewFile();
         }
         done = true;
+    }
+    
+    private void managedFilesCleanup(ReleaseManifest mf){
+        java.io.File managedFileDir = new java.io.File("RADS/"+type + "/" + project + "/managedfiles/");
+        if(managedFileDir.exists()){
+            String[] versions = managedFileDir.list();
+            for (String v : versions){
+                boolean found = false;
+                for(File f : mf.files){
+                    if(f.fileType == 5 && f.release.equals(v)){
+                        found = true;
+                        break;
+                    }
+                }
+                if(!found){
+                    deleteDir(new java.io.File(managedFileDir, v));
+                }
+            }
+        }
     }
     
     private RAFDump getArchive(String s){
@@ -251,7 +269,7 @@ public class LoLPatcher extends PatchTask{
     }
     
     
-    private static void deleteDir(java.io.File dir){
+    public final static void deleteDir(java.io.File dir){
         if(dir.isDirectory()){
             String[] children = dir.list();
             for(String c : children){

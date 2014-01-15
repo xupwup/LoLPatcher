@@ -1,9 +1,3 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
-
 package lolpatcher;
 
 import java.awt.Point;
@@ -13,6 +7,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.FileWriter;
+import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -173,9 +168,9 @@ public class ConfigurationTask extends PatchTask{
         main.patchers.add(new CopyTask(
                 new File("RADS/projects/lol_air_client_config_"+server.toLowerCase()+"/releases/"+airconfigversion+"/deploy/"),
                 new File("RADS/projects/lol_air_client/releases/"+main.airversion+"/deploy/"), true));
-        main.patchers.add(new CopyTask(
-                new File("RADS/projects/lol_game_client/releases/"+gameversion+"/deploy/"), 
-                new File("RADS/solutions/lol_game_client_sln/releases/"+slnversion+"/deploy/"), true));
+        
+        
+        main.patchers.add(new SLNPatcher(gameversion, slnversion, main.ignoreS_OK));
         main.patchers.add(new CopyTask(
                 new File("RiotRadsIO.dll"), 
                 new File("RADS/"), true));
