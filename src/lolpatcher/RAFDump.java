@@ -2,7 +2,6 @@ package lolpatcher;
 
 import java.io.BufferedOutputStream;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -42,7 +41,7 @@ public class RAFDump {
         try {
             RandomAccessFile in = new RandomAccessFile(datRaf, "r");
             in.seek(f.startindex);
-            return (in.readByte() == 0x78 && in.readByte() == 0xffffff9c) ? true : false;
+            return (in.readByte() == 0x78 && in.readByte() == 0xffffff9c);
         } catch (FileNotFoundException ex) {
             Logger.getLogger(RAFDump.class.getName()).log(Level.SEVERE, null, ex);
         }

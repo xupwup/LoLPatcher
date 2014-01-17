@@ -1,5 +1,7 @@
 package nl.xupwup.Util;
 
+import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -7,6 +9,10 @@ import java.net.Socket;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import org.apache.http.HttpEntity;
+import org.apache.http.client.HttpClient;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.impl.client.HttpClients;
 
 public class MiniHttpClient implements AutoCloseable {
     private Socket sock;
@@ -36,11 +42,8 @@ public class MiniHttpClient implements AutoCloseable {
             port = Integer.parseInt(sp[1]);
         }
         this.server = sp[0];
-        sock = new Socket(this.server, port);
-        in = sock.getInputStream();
-        os = sock.getOutputStream();
         this.closeConnection = closeConnection;
-        close = closeConnection;
+        close = true;
     }
     
     public static class HttpResult{
@@ -83,7 +86,7 @@ public class MiniHttpClient implements AutoCloseable {
         @Override
         public int read(byte[] bytes, int offset, int count) throws IOException {
             // this function reads from the buffer "left" first, then just reads
-            // from the inputstream. (when getting the headers the get function will likely have
+            // from the inputstream. (when getting headers the get function will likely have
             // read too much, data that was supposed to be the response body)
             
             if(alreadyRead >= length && length != -1){
@@ -97,9 +100,7 @@ public class MiniHttpClient implements AutoCloseable {
                         count = Math.min(count, Math.min(length, left.length) - alreadyRead);
                     }
                     
-                    for(int i = 0; i < count; i++){
-                        bytes[i + offset] = left[alreadyRead + i];
-                    }
+                    System.arraycopy(left, alreadyRead, bytes, offset, count);
                 }else{
                     if(length != -1){
                         count = Math.min(count, length - alreadyRead);
@@ -150,11 +151,14 @@ public class MiniHttpClient implements AutoCloseable {
             readEverything(lastResult.in); // make sure everything is read, 
                                              // so we dont read old data instead of headers
         }
-        if(close){
-            close();
+        
+        if(close || sock.isClosed()){
+            if(sock != null){
+                close();
+            }
             sock = new Socket(server, port);
-            in = sock.getInputStream();
-            os = sock.getOutputStream();
+            in = new BufferedInputStream(sock.getInputStream());
+            os = new BufferedOutputStream(sock.getOutputStream());
         }
         close = closeConnection;
         
@@ -167,8 +171,8 @@ public class MiniHttpClient implements AutoCloseable {
         );
         os.flush();
         
-        byte[] buffer = new byte[1024];
-        byte[] obuffer = new byte[1024];
+        byte[] buffer = new byte[2048];
+        byte[] obuffer = new byte[2048];
         int left = 0;
         int read;
         
@@ -206,13 +210,21 @@ public class MiniHttpClient implements AutoCloseable {
             if(split[0].equalsIgnoreCase("Content-Length")){
                 length = Integer.parseInt(split[1].trim());
             }
-            if(split[0].equalsIgnoreCase("Connection") && split[1].equalsIgnoreCase("close")){
+            if(split[0].equalsIgnoreCase("Connection") && split[1].trim().equalsIgnoreCase("close")){
                 close = true;
+            }
+            if(split[0].equalsIgnoreCase("Transfer-Encoding") && split[1].trim().equalsIgnoreCase("chunked")){
+                throw new IOException("Chunked transfer encoding not supported.");
             }
         }
         if(close){
             length = -1;
         }
+        System.out.println(headers);
+        if(headers.isEmpty()){
+            System.out.println(read);
+        }
+        
         int status = Integer.parseInt(headers.get(0).split(" ")[1]);
         
         lastResult = new HttpResult(new HTTPInputStream(Arrays.copyOfRange(buffer, 0, left), in, length), headers, status);
@@ -241,19 +253,31 @@ public class MiniHttpClient implements AutoCloseable {
     }
     
     public static void main(String[] args) throws IOException{
-        MiniHttpClient cl = new MiniHttpClient("t.xupwup.nl");
-        cl.throwExceptionWhenNot200 = true;
-        HttpResult r = cl.get("/test");
-        int read;
-        byte[] bytes = new byte[1024];
-        while((read = r.in.read(bytes)) != -1){
-            System.out.print(new String(bytes, 0, read));
-            System.out.flush();
+        MiniHttpClient cl = new MiniHttpClient("192.168.1.30");
+        //cl.throwExceptionWhenNot200 = true;
+        
+        long start = System.currentTimeMillis();
+        for(int i = 0; i < 500; i++){
+            HttpResult r = cl.get("/asdf");
+            int read;
+            byte[] bytes = new byte[1024];
+            while((read = r.in.read(bytes)) != -1){
+                String string = new String(bytes, 0, read);
+            }
         }
-        HttpResult r2 = cl.get("/test2");
-        while((read = r2.in.read(bytes)) != -1){
-            System.out.print(new String(bytes, 0, read));
-            System.out.flush();
+        System.out.println("Time: " + (System.currentTimeMillis() - start));
+        start = System.currentTimeMillis();
+        HttpClient hc = HttpClients.createDefault();
+        for(int i = 0; i < 500; i++){
+            HttpEntity hte = hc.execute(new HttpGet(("http://192.168.1.30/asdf"))).getEntity();
+            InputStream in = hte.getContent();
+            int read;
+            byte[] bytes = new byte[1024];
+            while((read = in.read(bytes)) != -1){
+                String string = new String(bytes, 0, read);
+            }
         }
+        
+        System.out.println("Time: " + (System.currentTimeMillis() - start));
     }
 }

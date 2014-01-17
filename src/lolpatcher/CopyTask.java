@@ -29,7 +29,7 @@ public class CopyTask extends PatchTask {
     public CopyTask(File from, File to, boolean merge){
         this.from = from;
         this.to = to;
-        this.merge = merge && from.isDirectory();
+        this.merge = merge;
     }
     
     public void copy(File f, File dir) throws FileNotFoundException, IOException{
@@ -63,6 +63,8 @@ public class CopyTask extends PatchTask {
     @Override
     public void patch() throws MalformedURLException, IOException, NoSuchAlgorithmException {
         to.mkdirs();
+        
+        merge &= from.isDirectory();
         
         percentage = 0;
         if(!merge){
