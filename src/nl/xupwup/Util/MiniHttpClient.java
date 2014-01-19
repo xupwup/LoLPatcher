@@ -9,10 +9,6 @@ import java.net.Socket;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import org.apache.http.HttpEntity;
-import org.apache.http.client.HttpClient;
-import org.apache.http.client.methods.HttpGet;
-import org.apache.http.impl.client.HttpClients;
 
 public class MiniHttpClient implements AutoCloseable {
     private Socket sock;
@@ -20,9 +16,10 @@ public class MiniHttpClient implements AutoCloseable {
     private InputStream in;
     private String server;
     private int port = 80;
-    public HttpResult lastResult;
     private boolean close;
-    public boolean closeConnection;
+    private boolean closeConnection;
+    
+    public HttpResult lastResult;
     public boolean throwExceptionWhenNot200 = false;
     
     public MiniHttpClient(String server) throws IOException{
@@ -44,78 +41,6 @@ public class MiniHttpClient implements AutoCloseable {
         this.server = sp[0];
         this.closeConnection = closeConnection;
         close = true;
-    }
-    
-    public static class HttpResult{
-        public final List<String> headers;
-        public final InputStream in;
-        public final int code;
-        
-        private HttpResult(InputStream in, List<String> headers, int code){
-            this.headers = headers;
-            this.in = in;
-            this.code = code;
-        }
-    }
-    
-    private static class HTTPInputStream extends InputStream{
-        byte[] left;
-        int length;
-        int alreadyRead = 0;
-        InputStream actual;
-        
-        public HTTPInputStream(byte[] left, InputStream actual, int length) {
-            this.left = left;
-            this.actual = actual;
-            this.length = length;
-        }
-        
-        @Override
-        public int read() throws IOException {
-            if(alreadyRead >= length){
-                return -1;
-            }else{
-                if(alreadyRead < left.length){
-                    return left[alreadyRead++];
-                }else{
-                    return actual.read();
-                }
-            }
-        }
-
-        @Override
-        public int read(byte[] bytes, int offset, int count) throws IOException {
-            // this function reads from the buffer "left" first, then just reads
-            // from the inputstream. (when getting headers the get function will likely have
-            // read too much, data that was supposed to be the response body)
-            
-            if(alreadyRead >= length && length != -1){
-                return -1;
-            }else{
-                count = Math.min(count, bytes.length - offset);
-                if(alreadyRead < left.length){
-                    if(length == -1){
-                        count = Math.min(count, left.length - alreadyRead);
-                    }else{
-                        count = Math.min(count, Math.min(length, left.length) - alreadyRead);
-                    }
-                    
-                    System.arraycopy(left, alreadyRead, bytes, offset, count);
-                }else{
-                    if(length != -1){
-                        count = Math.min(count, length - alreadyRead);
-                    }
-                    count = actual.read(bytes, offset, count);
-                }
-                alreadyRead += count;
-                return count;
-            }
-        }
-
-        @Override
-        public int read(byte[] bytes) throws IOException {
-            return read(bytes, 0, bytes.length);
-        }
     }
     
     private static void sendRequest(OutputStream os, String query, String... headers) throws IOException{
@@ -170,13 +95,57 @@ public class MiniHttpClient implements AutoCloseable {
                 "User-Agent: rickHttpClient"
         );
         os.flush();
-        
-        byte[] buffer = new byte[2048];
-        byte[] obuffer = new byte[2048];
-        int left = 0;
-        int read;
+        boolean chunked = false;
         
         ArrayList<String> headers = new ArrayList<>();
+        
+        byte[] left = getHeaders(in, headers);
+
+        int length = -1;
+        for(String header : headers){
+            String[] split = header.split(":");
+            if(split[0].equalsIgnoreCase("Content-Length")){
+                length = Integer.parseInt(split[1].trim());
+            }
+            if(split[0].equalsIgnoreCase("Connection") && split[1].trim().equalsIgnoreCase("close")){
+                close = true;
+            }
+            if(split[0].equalsIgnoreCase("Transfer-Encoding") && split[1].trim().equalsIgnoreCase("chunked")){
+                chunked = true;
+            }
+        }
+        if(close){
+            length = -1;
+        }
+        
+        int status = Integer.parseInt(headers.get(0).split(" ")[1]);
+        
+        InputStream httpStream;
+        if(chunked){
+            assert(length == -1);
+            httpStream = new ChunkedInputStream(new HTTPInputStream(left, in, length));
+        }else{
+            httpStream = new HTTPInputStream(left, in, length);
+        }
+        lastResult = new HttpResult(httpStream, headers, status);
+        if(status != 200 && throwExceptionWhenNot200){
+            throw new IOException(headers.get(0) + ", for url: " + url);
+        }
+        return lastResult;
+    }
+    
+    /**
+     * 
+     * @param in
+     * @param headers
+     * @return bytes it read that belong to the response body.
+     * @throws IOException 
+     */
+    private static byte[] getHeaders(InputStream in, ArrayList<String> headers) throws IOException{
+        int left = 0;
+        byte[] buffer = new byte[2048];
+        byte[] obuffer = new byte[2048];
+        int read;
         while((read = in.read(buffer, left, buffer.length - left)) != -1){
             int idx = getNewlineInByteArray(buffer, 0, read + left);
             
@@ -204,39 +173,12 @@ public class MiniHttpClient implements AutoCloseable {
                 break;
             }
         }
-        int length = -1;
-        for(String header : headers){
-            String[] split = header.split(":");
-            if(split[0].equalsIgnoreCase("Content-Length")){
-                length = Integer.parseInt(split[1].trim());
-            }
-            if(split[0].equalsIgnoreCase("Connection") && split[1].trim().equalsIgnoreCase("close")){
-                close = true;
-            }
-            if(split[0].equalsIgnoreCase("Transfer-Encoding") && split[1].trim().equalsIgnoreCase("chunked")){
-                throw new IOException("Chunked transfer encoding not supported.");
-            }
-        }
-        if(close){
-            length = -1;
-        }
-        System.out.println(headers);
-        if(headers.isEmpty()){
-            System.out.println(read);
-        }
-        
-        int status = Integer.parseInt(headers.get(0).split(" ")[1]);
-        
-        lastResult = new HttpResult(new HTTPInputStream(Arrays.copyOfRange(buffer, 0, left), in, length), headers, status);
-        if(status != 200 && throwExceptionWhenNot200){
-            throw new IOException(headers.get(0) + ", for " + url);
-        }
-        return lastResult;
+        return Arrays.copyOfRange(buffer, 0, left);
     }
     
     /**
      * Gets the first occurrence of a newline in a bytearray.
-     * @param in  the bytearray too search in
+     * @param in  the bytearray to search in
      * @param o  offset
      * @param max  the length of the array. (if this is less than in.length only the first 'max' elements will be considered)
      * @return 
@@ -252,32 +194,158 @@ public class MiniHttpClient implements AutoCloseable {
         return -1;
     }
     
-    public static void main(String[] args) throws IOException{
-        MiniHttpClient cl = new MiniHttpClient("192.168.1.30");
-        //cl.throwExceptionWhenNot200 = true;
+    public static class HttpResult{
+        public final List<String> headers;
+        public final InputStream in;
+        public final int code;
         
-        long start = System.currentTimeMillis();
-        for(int i = 0; i < 500; i++){
-            HttpResult r = cl.get("/asdf");
-            int read;
-            byte[] bytes = new byte[1024];
-            while((read = r.in.read(bytes)) != -1){
-                String string = new String(bytes, 0, read);
-            }
+        private HttpResult(InputStream in, List<String> headers, int code){
+            this.headers = headers;
+            this.in = in;
+            this.code = code;
         }
-        System.out.println("Time: " + (System.currentTimeMillis() - start));
-        start = System.currentTimeMillis();
-        HttpClient hc = HttpClients.createDefault();
-        for(int i = 0; i < 500; i++){
-            HttpEntity hte = hc.execute(new HttpGet(("http://192.168.1.30/asdf"))).getEntity();
-            InputStream in = hte.getContent();
-            int read;
-            byte[] bytes = new byte[1024];
-            while((read = in.read(bytes)) != -1){
-                String string = new String(bytes, 0, read);
-            }
+    }
+    
+    private static class ChunkedInputStream extends InputStream{
+        private final HTTPInputStream in;
+        int chunkRemaining = 0;
+        boolean firstChunk = true;
+        
+        public ChunkedInputStream(HTTPInputStream in) {
+            this.in = in;
         }
         
-        System.out.println("Time: " + (System.currentTimeMillis() - start));
+        private String[] getChunkHeader() throws IOException{
+            StringBuilder sb = new StringBuilder();
+            boolean fi = false;
+            while(true){
+                int read = in.read();
+                if(read == -1) {
+                    throw new IOException("Connection closed.");
+                }
+                if(read == '\n' && fi) break;
+
+                if(read != '\r'){
+                    sb.append((char) read);
+                }else{
+                    fi = true;
+                }
+            }
+            return sb.toString().split(";");
+        }
+        
+        private void updateChunk() throws IOException{
+            if(!firstChunk){ // if this is not the first chunk, skip over the CRLF
+                int r = in.read();
+                int n = in.read();
+                if(r != '\r' || n != '\n'){
+                    throw new IOException("Invalid chunked encoding");
+                }
+            }
+            firstChunk = false;
+            
+            String[] chunkHeader = getChunkHeader();
+            chunkRemaining = Integer.parseInt(chunkHeader[0], 16);
+            if(chunkRemaining == 0){
+                byte[] bytesLeft = getHeaders(in, new ArrayList());
+                if(bytesLeft.length > 0){
+                    throw new IOException("Invalid chunked encoding");
+                }
+                if(in.left.length > in.alreadyRead){
+                    throw new IOException("Invalid chunked encoding");
+                }
+                chunkRemaining = -1;
+            }
+        }
+
+        @Override
+        public int read() throws IOException {
+            if(chunkRemaining == 0){
+                updateChunk();
+            }
+            if(chunkRemaining == -1){
+                return -1;
+            }
+            chunkRemaining--;
+            return in.read();
+        }
+
+        @Override
+        public int read(byte[] bytes, int offset, int count) throws IOException {
+            if(chunkRemaining == 0){
+                updateChunk();
+            }
+            if(chunkRemaining == -1){
+                return -1;
+            }
+
+            count = Math.min(count, chunkRemaining);
+
+            int read = in.read(bytes, offset, count);
+            chunkRemaining -= read;
+            return read;
+        }
+    }
+    
+    private static class HTTPInputStream extends InputStream{
+        final byte[] left;
+        final int length;
+        int alreadyRead = 0;
+        final InputStream actual;
+        
+        public HTTPInputStream(byte[] left, InputStream actual, int length) {
+            this.left = left;
+            this.actual = actual;
+            this.length = length;
+        }
+        
+        
+        @Override
+        public int read() throws IOException {
+            if(alreadyRead >= length && length != -1){
+                return -1;
+            }else{
+                if(alreadyRead < left.length){
+                    return left[alreadyRead++];
+                }else{
+                    return actual.read();
+                }
+            }
+        }
+        
+        @Override
+        public int read(byte[] bytes, int offset, int count) throws IOException {
+            // this function reads from the buffer "left" first, then just reads
+            // from the inputstream. (when getting headers the get function will likely have
+            // read too much, data that was supposed to be the response body)
+            
+            if(alreadyRead >= length && length != -1){
+                return -1;
+            }else{
+                count = Math.min(count, bytes.length - offset);
+                if(alreadyRead < left.length){
+                    if(length == -1){
+                        count = Math.min(count,                  left.length  - alreadyRead);
+                    }else{
+                        count = Math.min(count, Math.min(length, left.length) - alreadyRead);
+                    }
+                    
+                    System.arraycopy(left, alreadyRead, bytes, offset, count);
+                    alreadyRead += count;
+                }else{
+                    if(length != -1){
+                        count = Math.min(count, length - alreadyRead);
+                    }
+                    count = actual.read(bytes, offset, count);
+                }
+                
+                return count;
+            }
+        }
+
+        @Override
+        public int read(byte[] bytes) throws IOException {
+            return read(bytes, 0, bytes.length);
+        }
     }
 }
