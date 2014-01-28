@@ -39,6 +39,7 @@ public class ReleaseManifest {
     
     public class File{
         String release;
+        int releaseInt;
         String name;
         String path;
         byte[] checksum;
@@ -58,9 +59,10 @@ public class ReleaseManifest {
         int unknown3;
         int unknown4;
         
-        public File(String release, String name, byte[] checksum, int size,
+        public File(String release, int releaseInt, String name, byte[] checksum, int size,
                 int fileType, int unknown2, int unknown3, int unknown4) {
             this.release = release;
+            this.releaseInt = releaseInt;
             this.name = name;
             this.checksum = checksum;
             this.size = size;
@@ -236,7 +238,8 @@ public class ReleaseManifest {
             files = new File[fileMetaDatas.length];
             for(int i = 0; i < fileMetaDatas.length; i++){
                 FileMetaData meta = fileMetaDatas[i];
-                files[i] = new File(getReleaseName(meta.release), 
+                files[i] = new File(getReleaseName(meta.release),
+                        meta.release,
                         strs[meta.nameindex],
                         meta.checksum, meta.size,
                         meta.fileType, meta.unknownInt2,

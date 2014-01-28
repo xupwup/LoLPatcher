@@ -15,7 +15,10 @@ import java.net.URL;
 import java.security.DigestInputStream;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -115,17 +118,31 @@ public class LoLPatcher extends PatchTask{
         HttpClient hc = HttpClients.createDefault();
         System.out.println("go!");
         boolean noSync = false;
-        for(int i = 0; i < mf.files.length; i++){
-            File f = mf.files[i];
+        ArrayList<File> files = cullFiles(mf, oldmf);
+        
+        String lastRel = null;
+        
+        for(int i = 0; i < files.size(); i++){
+            File f = files.get(i);
             currentFile = f.name;
-            //System.out.println(f.path + f.name + " " + f.unknown1);
+            
+            if(lastRel != null && !lastRel.equals(f.release)){
+                // files are sorted on version because of cullfiles()
+                RAFDump rd = getArchive(lastRel); 
+                if(rd != null){
+                    currentFile = rd.raf.getName();
+                    rd.close();
+                }
+            }
+            lastRel = f.release;
+            
             // /*
             if(f.fileType == 22 || f.fileType == 6){
                 downloadFileToArchive(f, hc);
             }else{
-                downloadFile(f, oldmf, hc);
+                downloadFile(f, hc);
             }
-            percentage = 100f * i / mf.files.length;
+            percentage = 100f * i / files.size();
             if(done){
                 noSync = true;
                 break;
@@ -135,8 +152,12 @@ public class LoLPatcher extends PatchTask{
         
         percentage = 100;
         if(!noSync){
-            for(RAFDump rd : archives.values()){
-                if(rd != null) rd.close();
+            if(lastRel != null){ // sync the last raf file.
+                RAFDump rd = getArchive(lastRel);
+                if(rd != null){
+                    currentFile = rd.raf.getName();
+                    rd.close();
+                }
             }
             
             managedFilesCleanup(mf);
@@ -145,6 +166,38 @@ public class LoLPatcher extends PatchTask{
                 + targetVersion + "/S_OK").createNewFile();
         }
         done = true;
+    }
+    
+    private ArrayList<File> cullFiles(ReleaseManifest mf, ReleaseManifest oldmf){
+        ArrayList<File> files = new ArrayList<>();
+        for(File f : mf.files){
+            if(needPatch(f, oldmf)){
+                files.add(f);
+            }
+        }
+        Collections.sort(files, new Comparator<File>() {
+            @Override
+            public int compare(File o1, File o2) {
+                return Integer.compare(o1.releaseInt , o2.releaseInt);
+            }
+        });
+        return files;
+    }
+    
+    private boolean needPatch(File f, ReleaseManifest oldmf){
+        if(f.fileType == 22 || f.fileType == 6){
+            return getArchive(f.release) != null;
+        }else{
+            if(oldmf != null && !force){
+                File oldFile = oldmf.getFile(f.path + f.name);
+                if(oldFile != null && Arrays.equals(oldFile.checksum, f.checksum)
+                        && new java.io.File(getFileDir(f), f.name).exists()){
+                    
+                    return false;
+                }
+            }
+            return true;
+        }
     }
     
     private void managedFilesCleanup(ReleaseManifest mf){
@@ -197,30 +250,26 @@ public class LoLPatcher extends PatchTask{
         return rd;
     }
     
-    private boolean downloadFileToArchive(File f, HttpClient hc) throws IOException{
+    private void downloadFileToArchive(File f, HttpClient hc) throws IOException{
         RAFDump archive = getArchive(f.release);
-        if(archive != null){
-            String url = "http://l3cdn.riotgames.com/releases/live/"+type+"/"
-                + project + "/releases/" + f.release + "/files/" + 
-                f.path.replaceAll(" ", "%20") + f.name.replaceAll(" ", "%20") + (f.fileType > 0 ? ".compressed" : "");
-            HttpEntity hte = hc.execute(new HttpGet(url)).getEntity();
-            
-            try(InputStream in = (f.fileType == 6 ? new InflaterInputStream(hte.getContent()) : hte.getContent())){
-                archive.writeFile(f.path + f.name, in, this);
-            }
+        
+        String url = "http://l3cdn.riotgames.com/releases/live/"+type+"/"
+            + project + "/releases/" + f.release + "/files/" + 
+            f.path.replaceAll(" ", "%20") + f.name.replaceAll(" ", "%20") + (f.fileType > 0 ? ".compressed" : "");
+        HttpEntity hte = hc.execute(new HttpGet(url)).getEntity();
+
+        try(InputStream in = (f.fileType == 6 ? new InflaterInputStream(hte.getContent()) : hte.getContent())){
+            archive.writeFile(f.path + f.name, in, this);
         }
-        return false;
     }
     
-    private boolean downloadFile(File f, ReleaseManifest oldmf, HttpClient hc) throws MalformedURLException, IOException, NoSuchAlgorithmException{
-        if(oldmf != null && !force){
-            File oldFile = oldmf.getFile(f.path + f.name);
-            if(oldFile != null && Arrays.equals(oldFile.checksum, f.checksum)){
-                return true;
-            }
-        }
-        java.io.File targetDir = new java.io.File("RADS/"+type + "/" + project + (f.fileType == 5 ? "/managedfiles/" : "/releases/")
+    private java.io.File getFileDir(File f){
+        return  new java.io.File("RADS/"+type + "/" + project + (f.fileType == 5 ? "/managedfiles/" : "/releases/")
                 + (f.fileType == 5 ? f.release : targetVersion) + (f.fileType == 5 ? "/" : "/deploy/") + f.path);
+    }
+    
+    private void downloadFile(File f, HttpClient hc) throws MalformedURLException, IOException, NoSuchAlgorithmException{
+        java.io.File targetDir = getFileDir(f);
         java.io.File target = new java.io.File(targetDir.getPath() + "/" + f.name);
         
         String url = "http://l3cdn.riotgames.com/releases/live/"+type+"/"
@@ -235,7 +284,7 @@ public class LoLPatcher extends PatchTask{
             MessageDigest md = MessageDigest.getInstance("MD5");
             try (InputStream is = new DigestInputStream(new BufferedInputStream(new FileInputStream(target)), md)) {
                 int read;
-                byte[] buffer = new byte[40960];
+                byte[] buffer = new byte[4096];
                 
                 while((read = is.read(buffer)) != -1){
                     speedStat(read);
@@ -243,7 +292,7 @@ public class LoLPatcher extends PatchTask{
             }
             byte[] digest = md.digest();
             if(Arrays.equals(digest, f.checksum)){
-                return true;
+                return;
             }
         }
         
@@ -257,15 +306,14 @@ public class LoLPatcher extends PatchTask{
             
             try(OutputStream fo = new BufferedOutputStream(new FileOutputStream(target))){
                 int read;
-                byte[] buffer = new byte[40960];
+                byte[] buffer = new byte[4096];
                 while((read = in.read(buffer)) != -1){
                     fo.write(buffer, 0, read);
                     speedStat(read);
-                    if(done) return false;
+                    if(done) return;
                 }
             }
         }
-        return false;
     }
     
     

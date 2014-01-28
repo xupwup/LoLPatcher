@@ -123,7 +123,7 @@ public class RAFDump {
         fileList.add(rf);
         rf.pathlistindex = fileList.size()-1;
         
-        byte[] buffer = new byte[40960];
+        byte[] buffer = new byte[4096];
         int read;
         while((read = in.read(buffer)) != -1){
             out.write(buffer, 0, read);
@@ -261,35 +261,5 @@ public class RAFDump {
             e.printStackTrace();
         }
         return sb.toString();
-    }
-    
-    public static void main(String[] args) throws IOException{
-        //String path = "F:\\Netbeans\\tue-inf-overig-lolpatcher\\LoLPatcher\\RADS\\projects\\lol_game_client\\filearchives\\0.0.0.25";
-        //System.out.println(new RAFDump(new File(path + "\\Archive_1.raf"), new File(path + "\\Archive_1.raf.dat")).toString());
-        //String path2 = "F:\\Riot Games\\League of Legends\\RADS\\projects\\lol_game_client\\filearchives\\0.0.0.25";
-        //System.out.println(new RAFDump(new File(path2 + "\\Archive_151937888.raf"), new File(path2 + "\\Archive_151937888.raf.dat")).toString());
-        
-        
-        ReleaseManifest rm = ReleaseManifest.getReleaseManifest("lol_game_client", "0.0.0.194", "projects");
-        for(ReleaseManifest.File f : rm.files){
-            /*if(f.name.contains("DefaultCategories.fev")){
-                System.out.println("f.fileType=" + f.fileType);
-            }*/
-            if(f.fileType == 6){
-                System.out.println("f.name=" + f.name);
-            }
-        }
-        /*String pa = "F:\\Netbeans\\tue-inf-overig-lolpatcher\\LoLPatcher\\RADS\\projects\\lol_game_client\\filearchives\\";
-        File archives = new File(pa);
-        String[] acvs = archives.list();
-        
-        for(String a : acvs){
-            RAFDump rd = new RAFDump(new File(pa + a + "\\Archive_1.raf"), new File(pa + a + "\\Archive_1.raf.dat"));
-            for(RafFile rf : rd.fileList){
-                if(rf.name.contains("DefaultCategories.fev")){
-                    System.out.println("a=" + a);
-                }
-            }
-        }*/
     }
 }
