@@ -43,8 +43,12 @@ public class ArchiveDownloadWorker extends Thread{
                     progress = 0;
                     RAFArchive archive = patcher.getArchive(task.versionName);
                     for(int i = 0; i < task.files.size(); i++){
-                        progress = (float) i / task.files.size();
+                        if(patcher.done){
+                            break;
+                        }
+                        
                         downloadFileToArchive(task.files.get(i), htc, archive);
+                        progress = (float) i / task.files.size();
                     }
                     archive.close();
                     progress = 1;
