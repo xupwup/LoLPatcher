@@ -21,6 +21,7 @@ public class CopyTask extends PatchTask {
     File from;
     File to;
     boolean merge;
+    float percentage = 0;
     
     public CopyTask(File from, File to){
         this(from, to, true);
@@ -78,5 +79,10 @@ public class CopyTask extends PatchTask {
         }
         percentage = 100;
         done = true;
+    }
+    
+    @Override
+    public float getPercentage() {
+        return percentage;
     }
 }

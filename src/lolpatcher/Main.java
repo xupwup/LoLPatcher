@@ -33,7 +33,7 @@ import static org.lwjgl.opengl.GL11.*;
  * @author Rick Hendricksen
  */
 public class Main extends GLFramework {
-    public static final int patcherVersion = 4;
+    public static final int patcherVersion = 5;
     public List<PatchTask> patchers;
     int currentPatcher = -1;
     PatchTask patcher;
@@ -232,7 +232,7 @@ public class Main extends GLFramework {
             PatchTask lp = patcher;
             String currentFile = lp.currentFile;
             int speed = LoLPatcher.speed;
-            float percentage = Math.max(0.01f, lp.percentage);
+            float percentage = Math.max(0.01f, lp.getPercentage());
 
             long spent = (System.currentTimeMillis() - patcherStartTime);
             int etaSec = (int) (spent / (10 * percentage)) - (int) (spent / 1000);

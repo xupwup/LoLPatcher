@@ -13,7 +13,6 @@ public abstract class PatchTask extends Thread{
     public boolean done = false;
     public static int speed = 0;
     public String currentFile;
-    public float percentage = 100;
     public Exception error;
     
     static long lastSample = 0;
@@ -21,7 +20,7 @@ public abstract class PatchTask extends Thread{
     
     public abstract void patch() throws MalformedURLException, IOException, NoSuchAlgorithmException;
     
-    public static void speedStat(int read){
+    public static synchronized void speedStat(int read){
         long now = System.currentTimeMillis();
         bytesThisSample += read;
         if(now - lastSample > 1000){
@@ -30,6 +29,8 @@ public abstract class PatchTask extends Thread{
             lastSample = now;
         }
     }
+    
+    public abstract float getPercentage();
     
     @Override
     public void run() {

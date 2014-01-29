@@ -1,19 +1,11 @@
 package lolpatcher;
 
-import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
 import java.io.BufferedReader;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.FilenameFilter;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.io.OutputStream;
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.security.DigestInputStream;
-import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -22,12 +14,8 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import java.util.zip.InflaterInputStream;
 import lolpatcher.ReleaseManifest.File;
-import org.apache.http.HttpEntity;
-import org.apache.http.client.HttpClient;
-import org.apache.http.client.methods.HttpGet;
-import org.apache.http.impl.client.HttpClients;
+import nl.xupwup.Util.RingBuffer;
 
 /**
  * Query these urls for versions
@@ -50,12 +38,30 @@ public class LoLPatcher extends PatchTask{
     String targetVersion;
     String project;
     
-    private String type = "projects";
+    public String type = "projects";
+    
+    FileDownloadWorker[] fworkers;
+    ArchiveDownloadWorker[] aworkers;
     
     
     private boolean ignoreS_OK, force;
     
-    private HashMap<String, RAFDump> archives;
+    private HashMap<String, RAFArchive> archives;
+    float percentageInArchive;
+    
+    public RingBuffer<File> filesToPatch;
+    public RingBuffer<Archive> archivesToPatch;
+    
+    public class Archive{
+        String versionName;
+        ArrayList<File> files;
+
+        public Archive(String versionName, ArrayList<File> files) {
+            this.versionName = versionName;
+            this.files = files;
+        }
+    }
+    
     
     public LoLPatcher(String target, String project, boolean ignoreS_OK, boolean force, String type){
         this(target, project, ignoreS_OK, force);
@@ -78,7 +84,6 @@ public class LoLPatcher extends PatchTask{
             done = true;
             return;
         }
-        percentage = 0;
         
         
         ReleaseManifest oldmf = null;
@@ -114,58 +119,108 @@ public class LoLPatcher extends PatchTask{
         }
         
         ReleaseManifest mf = ReleaseManifest.getReleaseManifest(project, targetVersion, type);
-        
-        HttpClient hc = HttpClients.createDefault();
-        System.out.println("go!");
-        boolean noSync = false;
+
         ArrayList<File> files = cullFiles(mf, oldmf);
         
-        String lastRel = null;
         
-        for(int i = 0; i < files.size(); i++){
-            File f = files.get(i);
-            currentFile = f.name;
-            
-            if(lastRel != null && !lastRel.equals(f.release)){
-                // files are sorted on version because of cullfiles()
-                RAFDump rd = getArchive(lastRel); 
-                if(rd != null){
-                    currentFile = rd.raf.getName();
-                    rd.close();
-                }
-            }
-            lastRel = f.release;
-            
-            // /*
+        int nrOfFiles = 0;
+        int nrOfArchiveFiles = 0;
+        
+        for(File f : files){
             if(f.fileType == 22 || f.fileType == 6){
-                downloadFileToArchive(f, hc);
+                nrOfArchiveFiles++;
             }else{
-                downloadFile(f, hc);
+                nrOfFiles++;
             }
-            percentage = 100f * i / files.size();
-            if(done){
-                noSync = true;
-                break;
+        }
+        percentageInArchive = (float) nrOfArchiveFiles / (nrOfArchiveFiles + nrOfFiles);
+        
+        ArrayList atp = new ArrayList<>();
+        filesToPatch = new RingBuffer<>(nrOfFiles);
+        
+        Archive lastArchive = null;
+        for(File f : files){
+            if(f.fileType == 22 || f.fileType == 6){
+                if(lastArchive == null || !lastArchive.versionName.equals(f.release)){
+                    lastArchive = new Archive(f.release, new ArrayList<File>());
+                    atp.add(lastArchive);
+                }
+                lastArchive.files.add(f);
+            }else{
+                filesToPatch.add(f);
             }
-            //*/
+        }
+        archivesToPatch = new RingBuffer<>(atp.size());
+        archivesToPatch.addAll(atp);
+        
+        fworkers = new FileDownloadWorker[6];
+        for(int i = 0; i < fworkers.length; i++){
+            fworkers[i] = new FileDownloadWorker(this);
+            fworkers[i].start();
+        }
+        // wait for file downloading to finish
+        for(FileDownloadWorker fw : fworkers){
+            try {
+                fw.join();
+            } catch (InterruptedException ex) {
+                Logger.getLogger(LoLPatcher.class.getName()).log(Level.SEVERE, null, ex);
+            }
         }
         
-        percentage = 100;
-        if(!noSync){
-            if(lastRel != null){ // sync the last raf file.
-                RAFDump rd = getArchive(lastRel);
-                if(rd != null){
-                    currentFile = rd.raf.getName();
-                    rd.close();
+        aworkers = new ArchiveDownloadWorker[6];
+        for(int i = 0; i < aworkers.length; i++){
+            aworkers[i] = new ArchiveDownloadWorker(this);
+            aworkers[i].start();
+        }
+        // wait for archive downloading to finish
+        for(ArchiveDownloadWorker aw : aworkers){
+            try {
+                aw.join();
+            } catch (InterruptedException ex) {
+                Logger.getLogger(LoLPatcher.class.getName()).log(Level.SEVERE, null, ex);
+            }
+        }
+        
+        
+        managedFilesCleanup(mf);
+            
+        new java.io.File("RADS/"+type + "/" + project + "/releases/"
+            + targetVersion + "/S_OK").createNewFile();
+        done = true;
+    }
+    
+    @Override
+    public float getPercentage(){
+        if(archivesToPatch == null){
+            return 0;
+        }
+        int total = filesToPatch.max();
+        float finished = total - filesToPatch.size();
+        
+        if(fworkers != null){
+            for(FileDownloadWorker fw : fworkers){
+                if(fw != null){
+                    finished -= (1 - fw.progress);
                 }
             }
-            
-            managedFilesCleanup(mf);
-            
-            new java.io.File("RADS/"+type + "/" + project + "/releases/"
-                + targetVersion + "/S_OK").createNewFile();
         }
-        done = true;
+        float filePart = finished / total;
+        
+        total = archivesToPatch.max();
+        finished = total - archivesToPatch.size();
+        
+        if(aworkers != null){
+            for(ArchiveDownloadWorker aw : aworkers){
+                if(aw != null){
+                    finished -= (1 - aw.progress);
+                }
+            }
+        }
+        float archivePart = finished / total;
+        if(total == 0){
+            archivePart = 0;
+        }
+        return (filePart * (1 - percentageInArchive) + archivePart * percentageInArchive) * 100;
     }
     
     private ArrayList<File> cullFiles(ReleaseManifest mf, ReleaseManifest oldmf){
@@ -219,8 +274,8 @@ public class LoLPatcher extends PatchTask{
         }
     }
     
-    private RAFDump getArchive(String s){
-        RAFDump rd = archives.get(s);
+    public RAFArchive getArchive(String s){
+        RAFArchive rd = archives.get(s);
         if(!archives.containsKey(s)){
             String folder = "RADS/"+type + "/" + project + "/filearchives/"
                 + s + "/";
@@ -241,7 +296,7 @@ public class LoLPatcher extends PatchTask{
                 new java.io.File(folder).mkdirs();
             }
             try {
-                rd = new RAFDump(folder + filename);
+                rd = new RAFArchive(folder + filename);
                 archives.put(s, rd);
             } catch (IOException ex) {
                 Logger.getLogger(LoLPatcher.class.getName()).log(Level.SEVERE, null, ex);
@@ -250,71 +305,14 @@ public class LoLPatcher extends PatchTask{
         return rd;
     }
     
-    private void downloadFileToArchive(File f, HttpClient hc) throws IOException{
-        RAFDump archive = getArchive(f.release);
-        
-        String url = "http://l3cdn.riotgames.com/releases/live/"+type+"/"
-            + project + "/releases/" + f.release + "/files/" + 
-            f.path.replaceAll(" ", "%20") + f.name.replaceAll(" ", "%20") + (f.fileType > 0 ? ".compressed" : "");
-        HttpEntity hte = hc.execute(new HttpGet(url)).getEntity();
-
-        try(InputStream in = (f.fileType == 6 ? new InflaterInputStream(hte.getContent()) : hte.getContent())){
-            archive.writeFile(f.path + f.name, in, this);
-        }
-    }
     
-    private java.io.File getFileDir(File f){
+    
+    public final java.io.File getFileDir(File f){
         return  new java.io.File("RADS/"+type + "/" + project + (f.fileType == 5 ? "/managedfiles/" : "/releases/")
                 + (f.fileType == 5 ? f.release : targetVersion) + (f.fileType == 5 ? "/" : "/deploy/") + f.path);
     }
     
-    private void downloadFile(File f, HttpClient hc) throws MalformedURLException, IOException, NoSuchAlgorithmException{
-        java.io.File targetDir = getFileDir(f);
-        java.io.File target = new java.io.File(targetDir.getPath() + "/" + f.name);
-        
-        String url = "http://l3cdn.riotgames.com/releases/live/"+type+"/"
-                + project + "/releases/" + f.release + "/files/" + 
-                f.path.replaceAll(" ", "%20") + f.name.replaceAll(" ", "%20") + (f.fileType > 0 ? ".compressed" : "");
-        
-        
-        
-        
-        targetDir.mkdirs();
-        if(!target.createNewFile()){
-            MessageDigest md = MessageDigest.getInstance("MD5");
-            try (InputStream is = new DigestInputStream(new BufferedInputStream(new FileInputStream(target)), md)) {
-                int read;
-                byte[] buffer = new byte[4096];
-                
-                while((read = is.read(buffer)) != -1){
-                    speedStat(read);
-                }
-            }
-            byte[] digest = md.digest();
-            if(Arrays.equals(digest, f.checksum)){
-                return;
-            }
-        }
-        
-        
-        HttpEntity hte = hc.execute(new HttpGet(url)).getEntity();
-        
-        try(InputStream in = (
-                f.fileType > 0 ? 
-                    new InflaterInputStream(hte.getContent()) :
-                    hte.getContent())){
-            
-            try(OutputStream fo = new BufferedOutputStream(new FileOutputStream(target))){
-                int read;
-                byte[] buffer = new byte[4096];
-                while((read = in.read(buffer)) != -1){
-                    fo.write(buffer, 0, read);
-                    speedStat(read);
-                    if(done) return;
-                }
-            }
-        }
-    }
+    
     
     
     public final static void deleteDir(java.io.File dir){

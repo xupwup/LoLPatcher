@@ -10,8 +10,10 @@ import java.security.NoSuchAlgorithmException;
  */
 public class RunTask extends PatchTask{
     public boolean neverContinue = false;
-    private String description;
+    private final String description;
     Runnable r;
+    private float percentage;
+    
     public RunTask(Runnable r, String description){
         this.r = r;
         this.description = description;
@@ -26,4 +28,8 @@ public class RunTask extends PatchTask{
         done = !neverContinue;
     }
     
+    @Override
+    public float getPercentage() {
+        return percentage;
+    }
 }

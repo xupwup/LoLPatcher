@@ -61,7 +61,9 @@ public class MiniHttpClient implements AutoCloseable {
     
     @Override
     public void close() throws IOException{
-        sock.close();
+        if(sock != null){
+            sock.close();
+        }
         close = true;
     }
     
@@ -331,14 +333,13 @@ public class MiniHttpClient implements AutoCloseable {
                     }
                     
                     System.arraycopy(left, alreadyRead, bytes, offset, count);
-                    alreadyRead += count;
                 }else{
                     if(length != -1){
                         count = Math.min(count, length - alreadyRead);
                     }
                     count = actual.read(bytes, offset, count);
                 }
-                
+                alreadyRead += count;
                 return count;
             }
         }

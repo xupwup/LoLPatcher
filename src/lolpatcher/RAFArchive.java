@@ -19,14 +19,14 @@ import static lolpatcher.StreamUtils.*;
  *
  * @author Rick
  */
-public class RAFDump {
+public class RAFArchive {
     File raf;
     File datRaf;
     OutputStream out;
     long currentindex;
     ArrayList<RafFile> fileList;
     
-    public RAFDump(String path) throws IOException{
+    public RAFArchive(String path) throws IOException{
         raf = new File(path);
         datRaf = new File(path + ".dat");
         datRaf.createNewFile();
@@ -43,12 +43,12 @@ public class RAFDump {
             in.seek(f.startindex);
             return (in.readByte() == 0x78 && in.readByte() == 0xffffff9c);
         } catch (FileNotFoundException ex) {
-            Logger.getLogger(RAFDump.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(RAFArchive.class.getName()).log(Level.SEVERE, null, ex);
         }
         return false;
     }
     
-    public RAFDump(File raf, File datRaf) throws FileNotFoundException, IOException{
+    public RAFArchive(File raf, File datRaf) throws FileNotFoundException, IOException{
         this.raf = raf;
         this.datRaf = datRaf;
         fileList = new ArrayList<>();
@@ -113,13 +113,14 @@ public class RAFDump {
     
     /**
      * Writes the .raf.dat file
-     * @param filename
+     * @param path
+     * @param name
      * @param in
      * @param patcher
      * @throws IOException 
      */
-    public void writeFile(String filename, InputStream in, LoLPatcher patcher) throws IOException{
-        RafFile rf = new RafFile(currentindex, filename);
+    public void writeFile(String path, String name, InputStream in, LoLPatcher patcher) throws IOException{
+        RafFile rf = new RafFile(currentindex, path + name);
         fileList.add(rf);
         rf.pathlistindex = fileList.size()-1;
         
@@ -130,6 +131,7 @@ public class RAFDump {
             LoLPatcher.speedStat(read);
             rf.size += read;
             if(patcher.done) return;
+            patcher.currentFile = name;
         }
         currentindex += rf.size;
     }
@@ -223,7 +225,7 @@ public class RAFDump {
                 rafOut.write(0x00); // path list count
             }
         } catch (FileNotFoundException ex) {
-            Logger.getLogger(RAFDump.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(RAFArchive.class.getName()).log(Level.SEVERE, null, ex);
         }
         out.close();
     }

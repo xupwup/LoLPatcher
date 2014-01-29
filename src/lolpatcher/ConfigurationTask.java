@@ -33,6 +33,7 @@ public class ConfigurationTask extends PatchTask{
     Main main;
     String slnversion;
     String server;
+    float percentage = 0;
     String language;
     
     public ConfigurationTask(String slnversion, Main main){
@@ -194,5 +195,10 @@ public class ConfigurationTask extends PatchTask{
         }, "Locale config"));
         
         done = true;
+    }
+
+    @Override
+    public float getPercentage() {
+        return percentage;
     }
 }
