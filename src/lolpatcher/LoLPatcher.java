@@ -194,7 +194,7 @@ public class LoLPatcher extends PatchTask{
         
         
         managedFilesCleanup(mf);
-        if(!done){
+        if(!done && error == null){
             new java.io.File("RADS/"+type + "/" + project + "/releases/"
                 + targetVersion + "/S_OK").createNewFile();
         }

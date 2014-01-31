@@ -191,8 +191,6 @@ public class Main extends GLFramework {
 
     @Override
     public void draw(int w, int h) {
-        glEnable(GL_BLEND);
-            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         inhibitFXAA = true;
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glMatrixMode(GL_PROJECTION);
