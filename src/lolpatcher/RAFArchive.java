@@ -131,7 +131,6 @@ public class RAFArchive {
             LoLPatcher.speedStat(read);
             rf.size += read;
             if(patcher.done) return;
-            patcher.currentFile = name;
         }
         currentindex += rf.size;
     }

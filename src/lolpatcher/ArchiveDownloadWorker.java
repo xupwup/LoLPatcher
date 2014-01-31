@@ -17,10 +17,9 @@ import nl.xupwup.Util.MiniHttpClient;
  *
  * @author Rick
  */
-public class ArchiveDownloadWorker extends Thread{
+public class ArchiveDownloadWorker extends Worker{
     
     LoLPatcher patcher;
-    public float progress = 1;
 
     public ArchiveDownloadWorker(LoLPatcher patcher) {
         this.patcher = patcher;
@@ -40,18 +39,21 @@ public class ArchiveDownloadWorker extends Thread{
                         }
                         task = patcher.archivesToPatch.remove(0);
                     }
+                    startTime = System.currentTimeMillis();
                     progress = 0;
                     RAFArchive archive = patcher.getArchive(task.versionName);
                     for(int i = 0; i < task.files.size(); i++){
                         if(patcher.done){
                             break;
                         }
-                        
-                        downloadFileToArchive(task.files.get(i), htc, archive);
+                        ReleaseManifest.File file = task.files.get(i);
+                        current = file.name;
+                        downloadFileToArchive(file, htc, archive);
                         progress = (float) i / task.files.size();
                     }
                     archive.close();
                     progress = 1;
+                    startTime = -1;
                 }
             }
         } catch (IOException ex) {

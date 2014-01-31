@@ -33,11 +33,12 @@ import static org.lwjgl.opengl.GL11.*;
  * @author Rick Hendricksen
  */
 public class Main extends GLFramework {
-    public static final int patcherVersion = 5;
+    public static final int patcherVersion = 6;
     public List<PatchTask> patchers;
     int currentPatcher = -1;
     PatchTask patcher;
     TextRenderer tr;
+    TextRenderer smallText;
     News news = new News();
     public String airversion;
     long patcherStartTime;
@@ -140,6 +141,7 @@ public class Main extends GLFramework {
         }, null));
         
         tr = new TextRenderer(new Font("SansSerif", Font.PLAIN, 15), true);
+        smallText = new TextRenderer(new Font("SansSerif", Font.PLAIN, 10), true);
         try {
             news.get();
             news.genTextures();
@@ -184,11 +186,13 @@ public class Main extends GLFramework {
 
     @Override
     public void glInit() {
-        
+        glDisable(GL_DEPTH_TEST);
     }
 
     @Override
     public void draw(int w, int h) {
+        glEnable(GL_BLEND);
+            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         inhibitFXAA = true;
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glMatrixMode(GL_PROJECTION);
@@ -255,6 +259,7 @@ public class Main extends GLFramework {
             int bary = texth + tr.getHeight();
             int barh = 10;
 
+            // progress bar
             int xoff = 5;
             glBegin(GL_QUADS);
                 glVertex2i(xoff, bary);
@@ -269,6 +274,25 @@ public class Main extends GLFramework {
                 glVertex2f(xoff + 2 + (598 - 2 * xoff - 2) * (percentage / 100), bary + barh - 2);
                 glVertex2f(xoff + 2 + (598 - 2 * xoff - 2) * (percentage / 100), bary + 2);
             glEnd();
+            
+            if(lp instanceof LoLPatcher){
+                LoLPatcher ptch = (LoLPatcher) lp;
+                if(ptch.workers != null){
+                    ArrayList<Worker> workers = new ArrayList<>(ptch.workers.length);
+                    for(Worker worker : ptch.workers){
+                        if(worker.startTime != -1){
+                            workers.add(worker);
+                        }
+                    }
+                    if(!workers.isEmpty()){
+                        int workerw = 600 / workers.size();
+                        for(int i = 0; i < workers.size(); i++){
+                            drawWorkerInfo(2 + i * workerw, bary + barh + 5, workerw - 4, workers.get(i));
+                        }
+                    }
+                }
+            }
+            
         }
         
         
@@ -317,6 +341,47 @@ public class Main extends GLFramework {
         }
     }
 
+    private void drawWorkerInfo(int x, int y, int width, Worker worker){
+        glColor3f(0.4f, 0.4f, 0.4f);
+        glBegin(GL_QUADS);
+            glVertex2f(x, y);
+            glVertex2f(x, y + 2);
+            glVertex2f(x + width, y + 2);
+            glVertex2f(x + width, y);
+        glEnd();
+        if(worker.alternative){
+            glColor3f(0.8f, 1, 0.8f);
+        }else{
+            glColor3f(0.7f, 0.7f, 1);
+        }
+        glBegin(GL_QUADS);
+            glVertex2f(x, y);
+            glVertex2f(x, y + 2);
+            glVertex2f(x + width*worker.progress, y + 2);
+            glVertex2f(x + width*worker.progress, y);
+        glEnd();
+        String current = worker.current;
+        if(current == null){
+            return;
+        }
+        glColor3f(0, 0, 0);
+        smallText.draw(current, x, y+ 3);
+        glColor3f(0.8f, 0.8f, 0.8f);
+        float tw = smallText.getWidth(current);
+        if(tw > width){
+            glBegin(GL_QUAD_STRIP);
+                glColor4f(0.8f, 0.8f, 0.8f, 0);
+                glVertex2f(x + 0.9f*width, y + 3);
+                glVertex2f(x + 0.9f*width, y + 3 + smallText.getHeight());
+                glColor4f(0.8f, 0.8f, 0.8f, 1);
+                glVertex2f(x + width, y + 3);
+                glVertex2f(x + width, y + 3 + smallText.getHeight());
+                glVertex2f(x + tw, y + 3);
+                glVertex2f(x + tw, y + 3 + smallText.getHeight());
+            glEnd();
+        }
+    }
+    
     @Override
     public void onClose() {
         if(!patchers.get(currentPatcher).done){

@@ -307,11 +307,14 @@ public class MiniHttpClient implements AutoCloseable {
             if(alreadyRead >= length && length != -1){
                 return -1;
             }else{
+                int r;
                 if(alreadyRead < left.length){
-                    return left[alreadyRead++];
+                    r = left[alreadyRead];
                 }else{
-                    return actual.read();
+                    r = actual.read();
                 }
+                alreadyRead++;
+                return r;
             }
         }
         

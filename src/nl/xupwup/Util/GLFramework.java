@@ -23,6 +23,7 @@ import org.lwjgl.input.Mouse;
 import org.lwjgl.opengl.Display;
 import org.lwjgl.opengl.DisplayMode;
 import static org.lwjgl.opengl.GL11.*;
+import static org.lwjgl.opengl.GL14.glBlendFuncSeparate;
 import static org.lwjgl.opengl.GL20.*;
 
 /**
@@ -184,6 +185,7 @@ public abstract class GLFramework extends Thread {
                 repaint = false;
                 applicationBuffer.bind();
                 glLoadIdentity();
+                glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
                 draw((int) windowSize.x, (int) windowSize.y);
             }
             backBuffer.bind();
@@ -193,6 +195,7 @@ public abstract class GLFramework extends Thread {
                 glUniform2f(fxaaShader.getUniformLocation("texcoordOffset"), 
                         1f / applicationBuffer.xsize, 1f / applicationBuffer.ysize);
             }
+            glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE);
             applicationBuffer.drawBuffer();
             if(useFXAA){
                 fxaaShader.disable();

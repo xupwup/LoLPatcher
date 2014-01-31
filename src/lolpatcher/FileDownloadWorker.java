@@ -28,9 +28,8 @@ import nl.xupwup.Util.MiniHttpClient;
  *
  * @author Rick
  */
-public class FileDownloadWorker extends Thread{
+public class FileDownloadWorker extends Worker{
     LoLPatcher patcher;
-    public float progress = 1;
 
     public FileDownloadWorker(LoLPatcher lp) {
         patcher = lp;
@@ -51,7 +50,10 @@ public class FileDownloadWorker extends Thread{
                         }
                         task = patcher.filesToPatch.remove(0);
                     }
+                    startTime = System.currentTimeMillis();
+                    current = task.name;
                     downloadFile(task, htc);
+                    startTime = -1;
                 }
             }
 
@@ -66,6 +68,7 @@ public class FileDownloadWorker extends Thread{
     
     private void downloadFile(ReleaseManifest.File f, MiniHttpClient hc) throws MalformedURLException, IOException, NoSuchAlgorithmException{
         progress = 0;
+        alternative = false;
         java.io.File targetDir = patcher.getFileDir(f);
         java.io.File target = new java.io.File(targetDir.getPath() + "/" + f.name);
         
@@ -75,27 +78,32 @@ public class FileDownloadWorker extends Thread{
         
         
         
-        
+        long total = 0;
         targetDir.mkdirs();
         if(!target.createNewFile()){
+            alternative = true;
             MessageDigest md = MessageDigest.getInstance("MD5");
             try (InputStream is = new DigestInputStream(new BufferedInputStream(new FileInputStream(target)), md)) {
                 int read;
                 byte[] buffer = new byte[4096];
-                
                 while((read = is.read(buffer)) != -1){
+                    total += read;
+                    progress = (float) total / f.size;
                     speedStat(read);
+                    if(patcher.done) return;
                 }
             }
             byte[] digest = md.digest();
             if(Arrays.equals(digest, f.checksum)){
                 return;
             }
+            alternative = false;
+            progress = 0;
         }
         
         
         MiniHttpClient.HttpResult hte = hc.get(url);
-        long total = 0;
+        total = 0;
         
         try(InputStream in = (
                 f.fileType > 0 ? 
@@ -111,7 +119,6 @@ public class FileDownloadWorker extends Thread{
                     total += read;
                     progress = (float) total / f.size;
                     if(patcher.done) return;
-                    patcher.currentFile = f.name;
                 }
             }
         }

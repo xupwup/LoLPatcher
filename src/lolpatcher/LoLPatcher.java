@@ -40,8 +40,8 @@ public class LoLPatcher extends PatchTask{
     
     public String type = "projects";
     
-    FileDownloadWorker[] fworkers;
-    ArchiveDownloadWorker[] aworkers;
+    Worker[] workers;
+   
     
     
     private boolean ignoreS_OK, force;
@@ -117,11 +117,13 @@ public class LoLPatcher extends PatchTask{
                 }
             }
         }
-        
+        currentFile = "Reading manifest";
         ReleaseManifest mf = ReleaseManifest.getReleaseManifest(project, targetVersion, type);
 
+        currentFile = "Calculating differences";
         ArrayList<File> files = cullFiles(mf, oldmf);
         
+        currentFile = "Organizing files";
         
         int nrOfFiles = 0;
         int nrOfArchiveFiles = 0;
@@ -135,7 +137,7 @@ public class LoLPatcher extends PatchTask{
         }
         percentageInArchive = (float) nrOfArchiveFiles / (nrOfArchiveFiles + nrOfFiles);
         
-        ArrayList atp = new ArrayList<>();
+        ArrayList<Archive> atp = new ArrayList<>();
         filesToPatch = new RingBuffer<>(nrOfFiles);
         
         Archive lastArchive = null;
@@ -150,32 +152,41 @@ public class LoLPatcher extends PatchTask{
                 filesToPatch.add(f);
             }
         }
+        Collections.sort(atp, new Comparator<Archive>() {
+            @Override
+            public int compare(Archive o1, Archive o2) {
+                return -Integer.compare(o1.files.size(), o2.files.size());
+            }
+        });
         archivesToPatch = new RingBuffer<>(atp.size());
         archivesToPatch.addAll(atp);
-        
-        fworkers = new FileDownloadWorker[6];
-        for(int i = 0; i < fworkers.length; i++){
-            fworkers[i] = new FileDownloadWorker(this);
-            fworkers[i].start();
+        currentFile = "Patching Separate files";
+        Worker[] workers2 = new FileDownloadWorker[6];
+        for(int i = 0; i < workers2.length; i++){
+            workers2[i] = new FileDownloadWorker(this);
+            workers2[i].start();
         }
+        workers = workers2;
         // wait for file downloading to finish
-        for(FileDownloadWorker fw : fworkers){
+        for(Worker w : workers){
             try {
-                fw.join();
+                w.join();
             } catch (InterruptedException ex) {
                 Logger.getLogger(LoLPatcher.class.getName()).log(Level.SEVERE, null, ex);
             }
         }
         
-        aworkers = new ArchiveDownloadWorker[6];
-        for(int i = 0; i < aworkers.length; i++){
-            aworkers[i] = new ArchiveDownloadWorker(this);
-            aworkers[i].start();
+        currentFile = "Patching Archives";
+        workers2 = new ArchiveDownloadWorker[6];
+        for(int i = 0; i < workers2.length; i++){
+            workers2[i] = new ArchiveDownloadWorker(this);
+            workers2[i].start();
         }
+        workers = workers2;
         // wait for archive downloading to finish
-        for(ArchiveDownloadWorker aw : aworkers){
+        for(Worker w : workers){
             try {
-                aw.join();
+                w.join();
             } catch (InterruptedException ex) {
                 Logger.getLogger(LoLPatcher.class.getName()).log(Level.SEVERE, null, ex);
             }
@@ -183,9 +194,10 @@ public class LoLPatcher extends PatchTask{
         
         
         managedFilesCleanup(mf);
-            
-        new java.io.File("RADS/"+type + "/" + project + "/releases/"
-            + targetVersion + "/S_OK").createNewFile();
+        if(!done){
+            new java.io.File("RADS/"+type + "/" + project + "/releases/"
+                + targetVersion + "/S_OK").createNewFile();
+        }
         done = true;
     }
     
@@ -197,8 +209,8 @@ public class LoLPatcher extends PatchTask{
         int total = filesToPatch.max();
         float finished = total - filesToPatch.size();
         
-        if(fworkers != null){
-            for(FileDownloadWorker fw : fworkers){
+        if(workers != null && workers instanceof FileDownloadWorker[]){
+            for(Worker fw : workers){
                 if(fw != null){
                     finished -= (1 - fw.progress);
                 }
@@ -209,10 +221,10 @@ public class LoLPatcher extends PatchTask{
         total = archivesToPatch.max();
         finished = total - archivesToPatch.size();
         
-        if(aworkers != null){
-            for(ArchiveDownloadWorker aw : aworkers){
-                if(aw != null){
-                    finished -= (1 - aw.progress);
+        if(workers != null && workers instanceof ArchiveDownloadWorker[]){
+            for(Worker w : workers){
+                if(w != null){
+                    finished -= (1 - w.progress);
                 }
             }
         }
