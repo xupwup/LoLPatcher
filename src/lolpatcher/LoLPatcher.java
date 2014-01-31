@@ -93,7 +93,7 @@ public class LoLPatcher extends PatchTask{
             String[] list = target.list(new FilenameFilter() {
                                 @Override
                                 public boolean accept(java.io.File dir, String name) {
-                                    return !name.equals(targetVersion) && name.matches("((0|[1-9][0-9]{0,2})\\.){3}(0|[1-9][0-9]{0,2})");
+                                    return name.matches("((0|[1-9][0-9]{0,2})\\.){3}(0|[1-9][0-9]{0,2})");
                                 }
                             });
             if(list.length > 0){
