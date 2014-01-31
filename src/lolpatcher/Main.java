@@ -57,39 +57,11 @@ public class Main extends GLFramework {
     public void rerun(){
         patchers.clear();
         if(currentPatcher == -1){
-            patchers.add(new RunTask(new Runnable() {
-                @Override
-                public void run() {
-                    try {
-                        URL u = new URL("http://lolpatcher.xupwup.nl/version");
-                        URLConnection con = u.openConnection();
-                        BufferedReader in = new BufferedReader(new InputStreamReader(con.getInputStream()));
-                        StringBuilder response = new StringBuilder();
-                        String inputLine;
-                        
-                        while ((inputLine = in.readLine()) != null){
-                            response.append(inputLine);
-                        }
-                        in.close();
-                        int version = Integer.parseInt(response.toString().trim());
-                        if(version > patcherVersion){
-                            Window w = new Window(new Point(60,120), "Update available");
-                            w.addComponent(new TextField(300, "An update is available"
-                                    + " for XUPWUP's League of Legends Patcher. Get"
-                                    + " it at http://lolpatcher.xupwup.nl/", null));
-                            wm.addWindow(w);
-                        }
-                    } catch (IOException ex) {
-                        Logger.getLogger(Main.class.getName()).log(Level.SEVERE, null, ex);
-                    }
-
-                }
-            }, "Update check"));
+            patchers.add(new SelfUpdateTask());
         }
-        String slnversion = LoLPatcher.getVersion("solutions", "lol_game_client_sln", "EUW");
         
         
-        patchers.add(new ConfigurationTask(slnversion, this));
+        patchers.add(new ConfigurationTask(this));
         
         patcher = null;
         currentPatcher = -1;
@@ -404,7 +376,7 @@ public class Main extends GLFramework {
             if(x > playx && x < playx + playw &&
                     y > playy && y < playy + playh){
                 try {
-                    Runtime.getRuntime().exec(new String[]{"java", "-jar", "Maestro.jar", new java.io.File("RADS/solutions/lol_game_client_sln/releases/").getAbsolutePath()});
+                    Runtime.getRuntime().exec(new String[]{System.getProperty("java.home")+"/bin/java", "-jar", "Maestro.jar", new java.io.File("RADS/solutions/lol_game_client_sln/releases/").getAbsolutePath()});
 
                     Runtime.getRuntime().exec(new String[]{new java.io.File("RADS/projects/lol_air_client/releases/"+airversion+"/deploy/LolClient.exe").getAbsolutePath()});
                     System.exit(0);

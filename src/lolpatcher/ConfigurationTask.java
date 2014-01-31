@@ -7,7 +7,6 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.FileWriter;
-import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -36,15 +35,15 @@ public class ConfigurationTask extends PatchTask{
     float percentage = 0;
     String language;
     
-    public ConfigurationTask(String slnversion, Main main){
-        this.slnversion = slnversion;
+    public ConfigurationTask(Main main){
         this.main = main;
     }
     
     @Override
     public void patch() throws MalformedURLException, IOException, NoSuchAlgorithmException {
-        getSolutionManifest(slnversion);
         if(! new File("settings.txt").exists()){
+            slnversion = LoLPatcher.getVersion("solutions", "lol_game_client_sln", "EUW"); // temporarily use EUW to get language list
+            getSolutionManifest(slnversion);
             File solutionmanifest = new java.io.File("RADS/solutions/lol_game_client_sln/releases/" + slnversion + "/solutionmanifest");
             BufferedReader br = new BufferedReader(new FileReader(solutionmanifest));
             String line;
@@ -150,7 +149,9 @@ public class ConfigurationTask extends PatchTask{
     }
     
     public void addPatchers(){
+        slnversion = LoLPatcher.getVersion("solutions", "lol_game_client_sln", server);
         try {
+            getSolutionManifest(slnversion);
             dumpConfig();
         } catch (IOException ex) {
             Logger.getLogger(ConfigurationTask.class.getName()).log(Level.SEVERE, null, ex);
