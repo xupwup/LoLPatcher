@@ -29,7 +29,7 @@ import static org.lwjgl.opengl.GL11.*;
  * @author Rick Hendricksen
  */
 public class Main extends GLFramework {
-    public static final int patcherVersion = 6;
+    public static final int patcherVersion = 7;
     public List<PatchTask> patchers;
     int currentPatcher = -1;
     PatchTask patcher;

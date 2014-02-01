@@ -261,4 +261,13 @@ public class ReleaseManifest {
             }
         }
     }
+
+    @Override
+    public String toString() {
+        StringBuilder sb = new StringBuilder();
+        for(File f : files){
+            sb.append(f.path).append(f.name).append(" type:").append(f.fileType).append(" ").append(f.release).append("\n");
+        }
+        return sb.toString();
+    }
 }

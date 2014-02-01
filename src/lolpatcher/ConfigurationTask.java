@@ -7,6 +7,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.FileWriter;
+import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -163,10 +164,17 @@ public class ConfigurationTask extends PatchTask{
         String gameversion = LoLPatcher.getVersion("projects", "lol_game_client", server);
         String airconfigversion = LoLPatcher.getVersion("projects", "lol_air_client_config_"+server.toLowerCase(), server);
         String gamelanguageversion = LoLPatcher.getVersion("projects", "lol_game_client_"+language, server);
+        String launcherVersion = LoLPatcher.getVersion("projects", "lol_launcher", server);
         main.patchers.add(new LoLPatcher(main.airversion, "lol_air_client", main.ignoreS_OK, main.force));
         main.patchers.add(new LoLPatcher(gameversion, "lol_game_client", main.ignoreS_OK, main.force));
         main.patchers.add(new LoLPatcher(airconfigversion, "lol_air_client_config_"+server.toLowerCase(), main.ignoreS_OK, main.force));
         main.patchers.add(new LoLPatcher(gamelanguageversion, "lol_game_client_"+language, main.ignoreS_OK, main.force));
+        main.patchers.add(new LoLPatcher(launcherVersion, "lol_launcher", main.ignoreS_OK, main.force, new FilenameFilter() {
+            @Override
+            public boolean accept(File dir, String name) {
+                return name.equals("RiotRadsIO.dll");
+            }
+        }));
         main.patchers.add(new CopyTask(
                 new File("RADS/projects/lol_air_client_config_"+server.toLowerCase()+"/releases/"+airconfigversion+"/deploy/"),
                 new File("RADS/projects/lol_air_client/releases/"+main.airversion+"/deploy/"), true));
@@ -174,7 +182,7 @@ public class ConfigurationTask extends PatchTask{
         
         main.patchers.add(new SLNPatcher(gameversion, slnversion, main.ignoreS_OK));
         main.patchers.add(new CopyTask(
-                new File("RiotRadsIO.dll"), 
+                new File("RADS/projects/lol_launcher/releases/"+launcherVersion+"/deploy/RiotRadsIO.dll"), 
                 new File("RADS/"), true));
         
         main.patchers.add(new RunTask(new Runnable() {

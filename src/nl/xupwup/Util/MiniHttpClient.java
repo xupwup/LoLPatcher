@@ -291,8 +291,8 @@ public class MiniHttpClient implements AutoCloseable {
     
     private static class HTTPInputStream extends InputStream{
         final byte[] left;
-        final int length;
-        int alreadyRead = 0;
+        final long length;
+        long alreadyRead = 0;
         final InputStream actual;
         
         public HTTPInputStream(byte[] left, InputStream actual, int length) {
@@ -309,7 +309,7 @@ public class MiniHttpClient implements AutoCloseable {
             }else{
                 int r;
                 if(alreadyRead < left.length){
-                    r = left[alreadyRead];
+                    r = left[(int) alreadyRead];
                 }else{
                     r = actual.read();
                 }
@@ -330,15 +330,15 @@ public class MiniHttpClient implements AutoCloseable {
                 count = Math.min(count, bytes.length - offset);
                 if(alreadyRead < left.length){
                     if(length == -1){
-                        count = Math.min(count,                  left.length  - alreadyRead);
+                        count = (int) Math.min(count,                  left.length  - alreadyRead);
                     }else{
-                        count = Math.min(count, Math.min(length, left.length) - alreadyRead);
+                        count = (int) Math.min(count, Math.min(length, left.length) - alreadyRead);
                     }
                     
-                    System.arraycopy(left, alreadyRead, bytes, offset, count);
+                    System.arraycopy(left, (int) alreadyRead, bytes, offset, count);
                 }else{
                     if(length != -1){
-                        count = Math.min(count, length - alreadyRead);
+                        count = (int) Math.min(count, length - alreadyRead);
                     }
                     count = actual.read(bytes, offset, count);
                 }

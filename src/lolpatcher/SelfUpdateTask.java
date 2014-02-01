@@ -38,10 +38,10 @@ public class SelfUpdateTask extends PatchTask{
             done = true;
             return;
         }
-        currentFile = "Downloading update";
         for(int i = 1; i < response.size(); i++){
             MiniHttpClient.HttpResult get = hc.get("/data/"+response.get(i));
             String filename = response.get(i);
+            currentFile = filename;
             if(!filename.equals("SelfPatchFinalizer.jar")){
                 filename = filename + ".new";
             }

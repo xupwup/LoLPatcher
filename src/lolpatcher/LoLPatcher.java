@@ -45,6 +45,7 @@ public class LoLPatcher extends PatchTask{
     
     
     private boolean ignoreS_OK, force;
+    private FilenameFilter filter;
     
     private HashMap<String, RAFArchive> archives;
     float percentageInArchive;
@@ -63,9 +64,9 @@ public class LoLPatcher extends PatchTask{
     }
     
     
-    public LoLPatcher(String target, String project, boolean ignoreS_OK, boolean force, String type){
+    public LoLPatcher(String target, String project, boolean ignoreS_OK, boolean force, FilenameFilter filter){
         this(target, project, ignoreS_OK, force);
-        this.type = type;
+        this.filter = filter;
     }
     
     public LoLPatcher(String target, String project, boolean ignoreS_OK, boolean force){
@@ -74,6 +75,12 @@ public class LoLPatcher extends PatchTask{
         this.ignoreS_OK = ignoreS_OK;
         this.force = force;
         archives = new HashMap<>();
+        filter = new FilenameFilter() {
+            @Override
+            public boolean accept(java.io.File dir, String name) {
+                return true;
+            }
+        };
     }
     
     @Override
@@ -84,7 +91,6 @@ public class LoLPatcher extends PatchTask{
             done = true;
             return;
         }
-        
         
         ReleaseManifest oldmf = null;
         java.io.File target = new java.io.File("RADS/" + type + "/" + project + "/releases/");
@@ -113,7 +119,7 @@ public class LoLPatcher extends PatchTask{
                         oldmf = new ReleaseManifest(new java.io.File(newname, "releasemanifest"));
                     }
                 }else{
-                    throw new IOException("New release version already exists!");
+                    throw new IOException("New release version already exists! Rename failed from " + old + " to " + targetVersion);
                 }
             }
         }
@@ -238,7 +244,7 @@ public class LoLPatcher extends PatchTask{
     private ArrayList<File> cullFiles(ReleaseManifest mf, ReleaseManifest oldmf){
         ArrayList<File> files = new ArrayList<>();
         for(File f : mf.files){
-            if(needPatch(f, oldmf)){
+            if(filter.accept(null, f.name) && needPatch(f, oldmf)){
                 files.add(f);
             }
         }
