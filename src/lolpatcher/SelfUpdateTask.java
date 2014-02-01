@@ -2,7 +2,9 @@ package lolpatcher;
 
 import java.io.BufferedOutputStream;
 import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.FileOutputStream;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
@@ -42,10 +44,7 @@ public class SelfUpdateTask extends PatchTask{
             MiniHttpClient.HttpResult get = hc.get("/data/"+response.get(i));
             String filename = response.get(i);
             currentFile = filename;
-            if(!filename.equals("SelfPatchFinalizer.jar")){
-                filename = filename + ".new";
-            }
-            try (OutputStream fw = new BufferedOutputStream(new FileOutputStream(filename))) {
+            try (OutputStream fw = new BufferedOutputStream(new FileOutputStream(filename + ".new"))) {
                 int read;
                 byte[] buffer = new byte[1024];
                 while((read = get.in.read(buffer)) != -1){
@@ -54,14 +53,11 @@ public class SelfUpdateTask extends PatchTask{
             }
             percentage = 100f * i / response.size();
         }
-        String[] args = new String[3 + response.size()-1];
-        args[0] = System.getProperty("java.home")+"/bin/java";
-        args[1] = "-jar";
-        args[2] = "SelfPatchFinalizer.jar";
-        for(int i = 1; i < response.size(); i++){
-            args[i+2] = response.get(i);
+        try (BufferedWriter bw = new BufferedWriter(new FileWriter("patchList.txt"))) {
+            for(int i = 1; i < response.size(); i++){
+                bw.write(response.get(i) + "\n");
+            }
         }
-        Runtime.getRuntime().exec(args);
         System.exit(0);
     }
 
