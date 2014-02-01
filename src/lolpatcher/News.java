@@ -5,6 +5,8 @@ import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import javax.imageio.ImageIO;
 import nl.xupwup.Util.Color;
 import nl.xupwup.Util.TextRenderer;
@@ -24,11 +26,13 @@ import static org.lwjgl.opengl.GL11.*;
 public class News {
     int serverStatus;
     boolean status;
-    private ArrayList<CommunityItem> communityItems;
-    private ArrayList<NewsItem> newsItems;
+    private final ArrayList<CommunityItem> communityItems;
+    private final ArrayList<NewsItem> newsItems;
     public TextRenderer bold;
     TextRenderer normal;
     
+    boolean genTextures = false;
+    boolean readyForDrawing = false;
     public News(){
         communityItems = new ArrayList<>();
         newsItems = new ArrayList<>();
@@ -36,8 +40,6 @@ public class News {
     
     
     public void genTextures(){
-        bold = new TextRenderer(new Font("SansSerif", Font.BOLD, 15), true);
-        normal = new TextRenderer(new Font("SansSerif", Font.BOLD, 13), true);
         for(CommunityItem c : communityItems){
             c.imageTex = new Texture(c.image);
             c.promoText = TextRenderer.wordWrap(c.promoText, normal, 590);
@@ -50,6 +52,14 @@ public class News {
     long shiftStart = 0;
     
     public int draw(){
+        if(genTextures){
+            genTextures();
+            readyForDrawing = true;
+            genTextures = false;
+        }
+        if(!readyForDrawing){
+            return 378;
+        }
         glColor3f(1,1,1);
         int index = 0;
         for(NewsItem ni : newsItems){
@@ -139,43 +149,60 @@ public class News {
     }
     
     public void get() throws IOException{
-        try (CloseableHttpClient hc = HttpClients.createDefault()) {
-            HttpEntity hte = hc.execute(new HttpGet("http://ll.leagueoflegends.com/pages/launcher/euw?lang=en")).getEntity();
-            
-            InputStream in = hte.getContent();
-            StringBuilder sb = new StringBuilder();
-            int read;
-            byte[] buffer = new byte[4096];
-            while((read = in.read(buffer)) != -1){
-                sb.append(new String(buffer, 0, read));
-            }
-            String result = sb.toString();
-            result = result.substring(result.indexOf("(") + 1);
-            result = result.substring(0, result.lastIndexOf(")"));
-            JSONObject obj = new JSONObject(result);
-            
-            JSONArray community = obj.getJSONArray("community");
-            JSONArray news = obj.getJSONArray("news");
-            serverStatus = obj.getInt("serverStatus");
-            status = obj.getBoolean("status");
-            
-            
-            
-            for(int i = 0; i < community.length(); i++){
-                JSONObject o2 = community.getJSONObject(i);
-                String imageurl = o2.getString("imageUrl");
-                String linkurl = o2.getString("linkUrl");
-                String thumbUrl = o2.getString("thumbUrl");
-                HttpEntity http = hc.execute(new HttpGet(imageurl)).getEntity();
-                //HttpEntity http2 = hc.execute(new HttpGet(thumbUrl)).getEntity();
-                communityItems.add(new CommunityItem(ImageIO.read(http.getContent()), null, linkurl, o2.getString("title"), o2.getString("promoText")));
-            }
-            
-            
-            for(int i = 0; i < news.length(); i++){
-                JSONObject o2 = news.getJSONObject(i);
-                newsItems.add(new NewsItem(o2.getString("date"), o2.getString("title"), o2.getString("url")));
+        bold = new TextRenderer(new Font("SansSerif", Font.BOLD, 15), true);
+        normal = new TextRenderer(new Font("SansSerif", Font.BOLD, 13), true);
+        
+        Thread t = new Downloader();
+        t.start();
+    }
+    
+    private class Downloader extends Thread{
+
+        @Override
+        public void run() {
+            try (CloseableHttpClient hc = HttpClients.createDefault()) {
+                HttpEntity hte = hc.execute(new HttpGet("http://ll.leagueoflegends.com/pages/launcher/euw?lang=en")).getEntity();
+
+                InputStream in = hte.getContent();
+                StringBuilder sb = new StringBuilder();
+                int read;
+                byte[] buffer = new byte[4096];
+                while((read = in.read(buffer)) != -1){
+                    sb.append(new String(buffer, 0, read));
+                }
+                String result = sb.toString();
+                result = result.substring(result.indexOf("(") + 1);
+                result = result.substring(0, result.lastIndexOf(")"));
+                JSONObject obj = new JSONObject(result);
+
+                JSONArray community = obj.getJSONArray("community");
+                JSONArray news = obj.getJSONArray("news");
+                serverStatus = obj.getInt("serverStatus");
+                status = obj.getBoolean("status");
+
+
+
+                for(int i = 0; i < community.length(); i++){
+                    JSONObject o2 = community.getJSONObject(i);
+                    String imageurl = o2.getString("imageUrl");
+                    String linkurl = o2.getString("linkUrl");
+                    String thumbUrl = o2.getString("thumbUrl");
+                    HttpEntity http = hc.execute(new HttpGet(imageurl)).getEntity();
+                    //HttpEntity http2 = hc.execute(new HttpGet(thumbUrl)).getEntity();
+                    communityItems.add(new CommunityItem(ImageIO.read(http.getContent()), null, linkurl, o2.getString("title"), o2.getString("promoText")));
+                }
+
+
+                for(int i = 0; i < news.length(); i++){
+                    JSONObject o2 = news.getJSONObject(i);
+                    newsItems.add(new NewsItem(o2.getString("date"), o2.getString("title"), o2.getString("url")));
+                }
+                genTextures = true;
+            } catch (IOException ex) {
+                Logger.getLogger(News.class.getName()).log(Level.SEVERE, null, ex);
             }
         }
+        
     }
+    
 }
