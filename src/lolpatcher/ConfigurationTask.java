@@ -44,7 +44,7 @@ public class ConfigurationTask extends PatchTask{
     public void patch() throws MalformedURLException, IOException, NoSuchAlgorithmException {
         if(! new File("settings.txt").exists()){
             slnversion = LoLPatcher.getVersion("solutions", "lol_game_client_sln", "EUW"); // temporarily use EUW to get language list
-            getSolutionManifest(slnversion);
+            getSolutionManifest(slnversion, "live");
             File solutionmanifest = new java.io.File("RADS/solutions/lol_game_client_sln/releases/" + slnversion + "/solutionmanifest");
             BufferedReader br = new BufferedReader(new FileReader(solutionmanifest));
             String line;
@@ -67,7 +67,7 @@ public class ConfigurationTask extends PatchTask{
             final Window languageSelector = new Window(new Point(50, 10), "Select language");
             
             final Window serverSelector = new Window(new Point(70, 15), "Select server");
-            final String[] servers = new String[]{"EUW", "EUNE", "BR", "NA"};
+            final String[] servers = new String[]{"EUW", "EUNE", "BR", "NA", "PBE"};
             final SelectList serverlist = new SelectList(
                     servers
                     , null, null, 0);
@@ -116,8 +116,8 @@ public class ConfigurationTask extends PatchTask{
         }
     }
     
-    private void getSolutionManifest(String version) throws IOException{
-        URL u = new URL("http://l3cdn.riotgames.com/releases/live/solutions/lol_game_client_sln/releases/"+version+"/solutionmanifest");
+    private void getSolutionManifest(String version, String branch) throws IOException{
+        URL u = new URL("http://l3cdn.riotgames.com/releases/"+branch+"/solutions/lol_game_client_sln/releases/"+version+"/solutionmanifest");
         URLConnection con = u.openConnection();
         
         File f = new java.io.File("RADS/solutions/lol_game_client_sln/releases/" + version + "/solutionmanifest");
@@ -151,8 +151,9 @@ public class ConfigurationTask extends PatchTask{
     
     public void addPatchers(){
         slnversion = LoLPatcher.getVersion("solutions", "lol_game_client_sln", server);
+        String branch = (server.equals("PBE") ? "pbe" : "live");
         try {
-            getSolutionManifest(slnversion);
+            getSolutionManifest(slnversion, branch);
             dumpConfig();
         } catch (IOException ex) {
             Logger.getLogger(ConfigurationTask.class.getName()).log(Level.SEVERE, null, ex);
@@ -161,22 +162,25 @@ public class ConfigurationTask extends PatchTask{
         
         main.airversion = LoLPatcher.getVersion("projects", "lol_air_client", server);
         
+        String clientConfigName = "lol_air_client_config"+(server.equals("PBE") ? "" : "_"+server.toLowerCase());
+        
         String gameversion = LoLPatcher.getVersion("projects", "lol_game_client", server);
-        String airconfigversion = LoLPatcher.getVersion("projects", "lol_air_client_config_"+server.toLowerCase(), server);
+        String airconfigversion = LoLPatcher.getVersion("projects", clientConfigName, server);
         String gamelanguageversion = LoLPatcher.getVersion("projects", "lol_game_client_"+language, server);
         String launcherVersion = LoLPatcher.getVersion("projects", "lol_launcher", server);
-        main.patchers.add(new LoLPatcher(main.airversion, "lol_air_client", main.ignoreS_OK, main.force));
-        main.patchers.add(new LoLPatcher(gameversion, "lol_game_client", main.ignoreS_OK, main.force));
-        main.patchers.add(new LoLPatcher(airconfigversion, "lol_air_client_config_"+server.toLowerCase(), main.ignoreS_OK, main.force));
-        main.patchers.add(new LoLPatcher(gamelanguageversion, "lol_game_client_"+language, main.ignoreS_OK, main.force));
-        main.patchers.add(new LoLPatcher(launcherVersion, "lol_launcher", main.ignoreS_OK, main.force, new FilenameFilter() {
+        
+        main.patchers.add(new LoLPatcher(main.airversion, "lol_air_client", branch, main.ignoreS_OK, main.force));
+        main.patchers.add(new LoLPatcher(gameversion, "lol_game_client", branch, main.ignoreS_OK, main.force));
+        main.patchers.add(new LoLPatcher(airconfigversion, clientConfigName, branch, main.ignoreS_OK, main.force));
+        main.patchers.add(new LoLPatcher(gamelanguageversion, "lol_game_client_"+language, branch, main.ignoreS_OK, main.force));
+        main.patchers.add(new LoLPatcher(launcherVersion, "lol_launcher", branch, main.ignoreS_OK, main.force, new FilenameFilter() {
             @Override
             public boolean accept(File dir, String name) {
                 return name.equals("RiotRadsIO.dll");
             }
         }));
         main.patchers.add(new CopyTask(
-                new File("RADS/projects/lol_air_client_config_"+server.toLowerCase()+"/releases/"+airconfigversion+"/deploy/"),
+                new File("RADS/projects/"+clientConfigName+"/releases/"+airconfigversion+"/deploy/"),
                 new File("RADS/projects/lol_air_client/releases/"+main.airversion+"/deploy/"), true));
         
         

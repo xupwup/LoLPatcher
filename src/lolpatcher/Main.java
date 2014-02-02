@@ -357,6 +357,7 @@ public class Main extends GLFramework {
                 Logger.getLogger(Main.class.getName()).log(Level.SEVERE, null, ex);
             }
         }
+        System.exit(0);
     }
     
     @Override

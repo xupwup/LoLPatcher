@@ -37,6 +37,7 @@ import nl.xupwup.Util.RingBuffer;
 public class LoLPatcher extends PatchTask{
     String targetVersion;
     String project;
+    String branch;
     
     public String type = "projects";
     
@@ -64,16 +65,17 @@ public class LoLPatcher extends PatchTask{
     }
     
     
-    public LoLPatcher(String target, String project, boolean ignoreS_OK, boolean force, FilenameFilter filter){
-        this(target, project, ignoreS_OK, force);
+    public LoLPatcher(String target, String project, String branch, boolean ignoreS_OK, boolean force, FilenameFilter filter){
+        this(target, project, branch, ignoreS_OK, force);
         this.filter = filter;
     }
     
-    public LoLPatcher(String target, String project, boolean ignoreS_OK, boolean force){
+    public LoLPatcher(String target, String project, String branch, boolean ignoreS_OK, boolean force){
         targetVersion = target;
         this.project = project;
         this.ignoreS_OK = ignoreS_OK;
         this.force = force;
+        this.branch = branch;
         archives = new HashMap<>();
         filter = new FilenameFilter() {
             @Override
@@ -124,7 +126,7 @@ public class LoLPatcher extends PatchTask{
             }
         }
         currentFile = "Reading manifest";
-        ReleaseManifest mf = ReleaseManifest.getReleaseManifest(project, targetVersion, type);
+        ReleaseManifest mf = ReleaseManifest.getReleaseManifest(project, targetVersion, branch, type);
 
         currentFile = "Calculating differences";
         ArrayList<File> files = cullFiles(mf, oldmf);
@@ -345,7 +347,7 @@ public class LoLPatcher extends PatchTask{
     
     public static String getVersion(String type, String project, String server){
         try {
-            URL u = new URL("http://l3cdn.riotgames.com/releases/live/"+type+"/"+project+"/releases/releaselisting_"+server);
+            URL u = new URL("http://l3cdn.riotgames.com/releases/"+(server.equals("PBE") ? "pbe" : "live")+"/"+type+"/"+project+"/releases/releaselisting_"+server);
             try(BufferedReader rd = new BufferedReader(new InputStreamReader(u.openStream()))){
                 return rd.readLine();
             } catch (IOException ex) {

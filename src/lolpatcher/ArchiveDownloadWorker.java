@@ -65,7 +65,7 @@ public class ArchiveDownloadWorker extends Worker{
     }
     
     private void downloadFileToArchive(ReleaseManifest.File f, MiniHttpClient hc, RAFArchive archive) throws IOException{
-        String url = "/releases/live/"+patcher.type+"/"
+        String url = "/releases/"+patcher.branch+"/"+patcher.type+"/"
             + patcher.project + "/releases/" + f.release + "/files/" + 
             f.path.replaceAll(" ", "%20") + f.name.replaceAll(" ", "%20") + (f.fileType > 0 ? ".compressed" : "");
         MiniHttpClient.HttpResult hte = hc.get(url);

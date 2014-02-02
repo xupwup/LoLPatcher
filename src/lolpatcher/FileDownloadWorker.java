@@ -72,7 +72,7 @@ public class FileDownloadWorker extends Worker{
         java.io.File targetDir = patcher.getFileDir(f);
         java.io.File target = new java.io.File(targetDir.getPath() + "/" + f.name);
         
-        String url = "/releases/live/"+patcher.type+"/"
+        String url = "/releases/"+patcher.branch+"/"+patcher.type+"/"
                 + patcher.project + "/releases/" + f.release + "/files/" + 
                 f.path.replaceAll(" ", "%20") + f.name.replaceAll(" ", "%20") + (f.fileType > 0 ? ".compressed" : "");
         

@@ -147,8 +147,8 @@ public class ReleaseManifest {
         return r;
     }
     
-    public static ReleaseManifest getReleaseManifest(String component, String version, String type) throws IOException{
-        URL u = new URL("http://l3cdn.riotgames.com/releases/live/"+type+"/"+component+"/releases/"+version+"/releasemanifest");
+    public static ReleaseManifest getReleaseManifest(String component, String version, String branch, String type) throws IOException{
+        URL u = new URL("http://l3cdn.riotgames.com/releases/"+branch+"/"+type+"/"+component+"/releases/"+version+"/releasemanifest");
         URLConnection con = u.openConnection();
         java.io.File f = new java.io.File("RADS/"+type + "/" + component + "/releases/" + version + "/releasemanifest");
         new java.io.File(f.getParent()).mkdirs();

@@ -2,9 +2,13 @@ package lolpatcher;
 
 import java.awt.Font;
 import java.awt.image.BufferedImage;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.imageio.ImageIO;
@@ -160,8 +164,20 @@ public class News {
 
         @Override
         public void run() {
+            String server = "euw";
+            if(new File("settings.txt").exists()){
+                Properties props = new Properties();
+                try {
+                    props.load(new FileReader("settings.txt"));
+                    server = props.getProperty("server").toLowerCase();
+                } catch (IOException ex) {
+                    Logger.getLogger(News.class.getName()).log(Level.SEVERE, null, ex);
+                }
+            }
+            
+            
             try (CloseableHttpClient hc = HttpClients.createDefault()) {
-                HttpEntity hte = hc.execute(new HttpGet("http://ll.leagueoflegends.com/pages/launcher/euw?lang=en")).getEntity();
+                HttpEntity hte = hc.execute(new HttpGet("http://ll.leagueoflegends.com/pages/launcher/"+server+"?lang=en")).getEntity();
 
                 InputStream in = hte.getContent();
                 StringBuilder sb = new StringBuilder();
