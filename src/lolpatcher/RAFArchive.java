@@ -11,6 +11,7 @@ import java.io.RandomAccessFile;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import static lolpatcher.StreamUtils.*;
@@ -25,6 +26,7 @@ public class RAFArchive {
     OutputStream out;
     long currentindex;
     ArrayList<RafFile> fileList;
+    HashMap<String, RafFile> dictionary;
     
     public RAFArchive(String path) throws IOException{
         raf = new File(path);
@@ -32,6 +34,7 @@ public class RAFArchive {
         datRaf.createNewFile();
         fileList = new ArrayList<>();
         out = new BufferedOutputStream(new FileOutputStream(datRaf));
+        dictionary = new HashMap<>();
     }
     
     /**
@@ -52,47 +55,53 @@ public class RAFArchive {
         this.raf = raf;
         this.datRaf = datRaf;
         fileList = new ArrayList<>();
-        RandomAccessFile in = new RandomAccessFile(raf, "r");
-        
-        int magicNumber = getInt(in);
-        assert(magicNumber == 0x18be0ef0);
-        int version = getInt(in);
-        //System.out.println("Raf version: " + version);
-        int managerIndex = getInt(in);
-        //System.out.println("ManagerIndex: " + managerIndex);
-        
-        int fileListOffset = getInt(in);
-        int pathListOffset = getInt(in);
-        int nfiles = getInt(in);
-        for(int i = 0; i < nfiles; i++){
-            int pathHash = getInt(in);
-            long offset = getInt(in) & 0x00000000ffffffffL;
-            int size = getInt(in);
-            int pathlistindex = getInt(in);
+        try (RandomAccessFile in = new RandomAccessFile(raf, "r")) {
+            int magicNumber = getInt(in);
+            assert(magicNumber == 0x18be0ef0);
+            int version = getInt(in);
+            //System.out.println("Raf version: " + version);
+            int managerIndex = getInt(in);
+            //System.out.println("ManagerIndex: " + managerIndex);
             
-            RafFile rf = new RafFile(offset, "");
-            rf.pathhash = pathHash;
-            rf.size = size;
-            rf.pathlistindex = pathlistindex;
+            int fileListOffset = getInt(in);
+            int pathListOffset = getInt(in);
+            int nfiles = getInt(in);
+            for(int i = 0; i < nfiles; i++){
+                int pathHash = getInt(in);
+                long offset = getInt(in) & 0x00000000ffffffffL;
+                int size = getInt(in);
+                int pathlistindex = getInt(in);
+                
+                RafFile rf = new RafFile(offset, "");
+                rf.pathhash = pathHash;
+                rf.size = size;
+                rf.pathlistindex = pathlistindex;
+                
+                fileList.add(rf);
+            }
             
-            fileList.add(rf);
+            long offset = in.getFilePointer();
+            int pathListSize = getInt(in);
+            int pathListCount = getInt(in);
+            for(int i = 0; i < fileList.size(); i++){
+                RafFile rf = fileList.get(i);
+                in.seek(offset + 8 + rf.pathlistindex * 8);
+                int stringOffset = getInt(in);
+                int stringLength = getInt(in);
+                
+                in.seek(stringOffset + offset);
+                rf.name = new String(getBytes(in, stringLength-1)); // -1 to clip \0
+            }
         }
-        
-        long offset = in.getFilePointer();
-        int pathListSize = getInt(in);
-        int pathListCount = getInt(in);
-        for(int i = 0; i < fileList.size(); i++){
-            RafFile rf = fileList.get(i);
-            in.seek(offset + 8 + rf.pathlistindex * 8);
-            int stringOffset = getInt(in);
-            int stringLength = getInt(in);
-            
-            in.seek(stringOffset + offset);
-            rf.name = new String(getBytes(in, stringLength));
+        dictionary = new HashMap<>();
+        for(RafFile f : fileList){
+            dictionary.put(f.name, f);
         }
+        out = new BufferedOutputStream(new FileOutputStream(datRaf, true));
+        currentindex = datRaf.length();
     }
     
-    private class RafFile{
+    public class RafFile{
         long startindex; // fits in unsigned int, but not in normal int
         int size = 0;
         String name;
@@ -111,6 +120,7 @@ public class RAFArchive {
         }
     }
     
+    
     /**
      * Writes the .raf.dat file
      * @param path
@@ -119,8 +129,8 @@ public class RAFArchive {
      * @param patcher
      * @throws IOException 
      */
-    public void writeFile(String path, String name, InputStream in, LoLPatcher patcher) throws IOException{
-        RafFile rf = new RafFile(currentindex, path + name);
+    public void writeFile(String path, InputStream in, PatchTask patcher) throws IOException{
+        RafFile rf = new RafFile(currentindex, path);
         fileList.add(rf);
         rf.pathlistindex = fileList.size()-1;
         
@@ -133,6 +143,7 @@ public class RAFArchive {
             if(patcher.done) return;
         }
         currentindex += rf.size;
+        dictionary.put(rf.name, rf);
     }
     
     /**
@@ -262,5 +273,55 @@ public class RAFArchive {
             e.printStackTrace();
         }
         return sb.toString();
+    }
+    
+    public InputStream readFile(String path) throws IOException{
+        RafFile selectedFile = dictionary.get(path);
+        if(selectedFile == null){
+            throw new FileNotFoundException("\"" + path +"\" was not found in archive " + raf.getPath());
+        }
+        
+        return new RafFileInputStream(selectedFile);
+    }
+    
+    private class RafFileInputStream extends InputStream{
+        int length;
+        
+        RandomAccessFile in;
+        public RafFileInputStream(RafFile f) throws IOException{
+            in = new RandomAccessFile(datRaf, "r");
+            in.seek(f.startindex);
+            this.length = f.size;
+        }
+
+        @Override
+        public void close() throws IOException {
+            in.close();
+        }
+        
+        @Override
+        public int read() throws IOException {
+            if(length > 0){
+                length--;
+                return in.read();
+            }else{
+                return -1;
+            }
+        }
+
+        @Override
+        public int read(byte[] b, int off, int len) throws IOException {
+            if(length <= 0){
+                return -1;
+            }
+            int read = in.read(b, off, Math.min(length, len));
+            length -= read;
+            return read;
+        }
+
+        @Override
+        public int read(byte[] b) throws IOException {
+            return read(b, 0, b.length);
+        }
     }
 }

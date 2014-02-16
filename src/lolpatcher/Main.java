@@ -29,7 +29,7 @@ import static org.lwjgl.opengl.GL11.*;
  * @author Rick Hendricksen
  */
 public class Main extends GLFramework {
-    public static final int patcherVersion = 8;
+    public static final int patcherVersion = 9;
     public List<PatchTask> patchers;
     int currentPatcher = -1;
     PatchTask patcher;
@@ -40,6 +40,7 @@ public class Main extends GLFramework {
     long patcherStartTime;
     boolean ignoreS_OK = false, force = false;
     Window repairWindow;
+    boolean purgeAfterwards = false;
     boolean changeRegionSettings = false;
     
     float playw, playh, playx, playy, repairw;
@@ -95,6 +96,12 @@ public class Main extends GLFramework {
             @Override
             public void click(Component c) {
                 changeRegionSettings = ((CheckBox) c).checked;
+            }
+        }, null));
+        repairWindow.addComponent(new Option("Purge archives", new Listener() {
+            @Override
+            public void click(Component c) {
+                purgeAfterwards = ((CheckBox) c).checked;
             }
         }, null));
         repairWindow.addComponent(new Button("Go", new Listener() {

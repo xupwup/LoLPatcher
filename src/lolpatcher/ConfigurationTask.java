@@ -169,6 +169,11 @@ public class ConfigurationTask extends PatchTask{
         String gamelanguageversion = LoLPatcher.getVersion("projects", "lol_game_client_"+language, server);
         String launcherVersion = LoLPatcher.getVersion("projects", "lol_launcher", server);
         
+        if(main.purgeAfterwards){
+            main.patchers.add(new ArchivePurgeTask("lol_game_client", gameversion, branch, "projects"));
+            done = true;
+            return;
+        }
         main.patchers.add(new LoLPatcher(main.airversion, "lol_air_client", branch, main.ignoreS_OK, main.force));
         main.patchers.add(new LoLPatcher(gameversion, "lol_game_client", branch, main.ignoreS_OK, main.force));
         main.patchers.add(new LoLPatcher(airconfigversion, clientConfigName, branch, main.ignoreS_OK, main.force));

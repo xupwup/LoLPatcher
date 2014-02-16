@@ -45,7 +45,7 @@ public class LoLPatcher extends PatchTask{
    
     
     
-    private boolean ignoreS_OK, force;
+    public final boolean ignoreS_OK, force;
     private FilenameFilter filter;
     
     private HashMap<String, RAFArchive> archives;
@@ -54,7 +54,7 @@ public class LoLPatcher extends PatchTask{
     public RingBuffer<File> filesToPatch;
     public RingBuffer<Archive> archivesToPatch;
     
-    public class Archive{
+    public static class Archive{
         String versionName;
         ArrayList<File> files;
 
@@ -243,7 +243,7 @@ public class LoLPatcher extends PatchTask{
         return (filePart * (1 - percentageInArchive) + archivePart * percentageInArchive) * 100;
     }
     
-    private ArrayList<File> cullFiles(ReleaseManifest mf, ReleaseManifest oldmf){
+    private ArrayList<File> cullFiles(ReleaseManifest mf, ReleaseManifest oldmf) throws IOException{
         ArrayList<File> files = new ArrayList<>();
         for(File f : mf.files){
             if(filter.accept(null, f.name) && needPatch(f, oldmf)){
@@ -259,9 +259,14 @@ public class LoLPatcher extends PatchTask{
         return files;
     }
     
-    private boolean needPatch(File f, ReleaseManifest oldmf){
+    private boolean needPatch(File f, ReleaseManifest oldmf) throws IOException{
         if(f.fileType == 22 || f.fileType == 6){
-            return getArchive(f.release) != null;
+            RAFArchive archive = getArchive(f.release);
+            boolean res = archive.dictionary.get(f.path + f.name) == null;
+            if(res){
+                System.out.println("need patch " + f.name);
+            }
+            return res;
         }else{
             if(oldmf != null && !force){
                 File oldFile = oldmf.getFile(f.path + f.name);
@@ -294,7 +299,7 @@ public class LoLPatcher extends PatchTask{
         }
     }
     
-    public RAFArchive getArchive(String s){
+    public RAFArchive getArchive(String s) throws IOException{
         RAFArchive rd = archives.get(s);
         if(!archives.containsKey(s)){
             String folder = "RADS/"+type + "/" + project + "/filearchives/"
@@ -308,9 +313,9 @@ public class LoLPatcher extends PatchTask{
                 }
             });
             if(files.length > 0 && !force){
-                archives.put(s, null); // set it to null, so you dont have to list
-                                       // the directory every time
-                return null;
+                rd = new RAFArchive(new java.io.File(folder+ files[0]), new java.io.File(folder+ files[0] + ".dat"));
+                archives.put(s, rd);
+                return rd;
             }else if (files.length > 0){
                 deleteDir(new java.io.File(folder));
                 new java.io.File(folder).mkdirs();

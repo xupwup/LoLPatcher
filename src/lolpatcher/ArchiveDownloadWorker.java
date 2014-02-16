@@ -71,7 +71,7 @@ public class ArchiveDownloadWorker extends Worker{
         MiniHttpClient.HttpResult hte = hc.get(url);
 
         try(InputStream in = (f.fileType == 6 ? new InflaterInputStream(hte.in) : hte.in)){
-            archive.writeFile(f.path, f.name, in, patcher);
+            archive.writeFile(f.path + f.name, in, patcher);
         }
     }
     

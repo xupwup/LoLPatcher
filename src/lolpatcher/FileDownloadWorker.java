@@ -80,7 +80,7 @@ public class FileDownloadWorker extends Worker{
         
         long total = 0;
         targetDir.mkdirs();
-        if(!target.createNewFile()){
+        if(!target.createNewFile() && patcher.force){
             alternative = true;
             MessageDigest md = MessageDigest.getInstance("MD5");
             try (InputStream is = new DigestInputStream(new BufferedInputStream(new FileInputStream(target)), md)) {
