@@ -96,11 +96,15 @@ public class ArchivePurgeTask extends PatchTask {
         if(tempDir.exists()){
             LoLPatcher.deleteDir(tempDir);
         }
-        
-        // nothing to do
-        if(source.fileList.size() == ar.files.size()){
-            //return;
+        currentFile = ar.versionName;
+        long sum = 0;
+        for(RAFArchive.RafFile fi : source.fileList){
+            sum += fi.size;
         }
+        if(source.datRaf.length() == sum && source.fileList.size() == ar.files.size()){
+            return; // only purge if file has gaps or contains unneeded files
+        }
+        
         
         tempDir.mkdir();
         currentFile = "Loading " + ar.versionName;
