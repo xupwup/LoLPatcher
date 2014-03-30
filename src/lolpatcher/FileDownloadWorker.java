@@ -1,9 +1,3 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
-
 package lolpatcher;
 
 import java.io.BufferedInputStream;
@@ -14,10 +8,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.MalformedURLException;
-import java.security.DigestInputStream;
-import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.Arrays;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.zip.InflaterInputStream;
@@ -78,32 +69,18 @@ public class FileDownloadWorker extends Worker{
         
         
         
-        long total = 0;
         targetDir.mkdirs();
-        if(!target.createNewFile() && patcher.force){
+        if(!target.createNewFile() && (patcher.force || patcher.forceSingleFiles)){
             alternative = true;
-            MessageDigest md = MessageDigest.getInstance("MD5");
-            try (InputStream is = new DigestInputStream(new BufferedInputStream(new FileInputStream(target)), md)) {
-                int read;
-                byte[] buffer = new byte[4096];
-                while((read = is.read(buffer)) != -1){
-                    total += read;
-                    progress = (float) total / f.size;
-                    speedStat(read);
-                    if(patcher.done) return;
-                }
-            }
-            byte[] digest = md.digest();
-            if(Arrays.equals(digest, f.checksum)){
+            if(checkHash(new BufferedInputStream(new FileInputStream(target)), patcher, f)){
                 return;
             }
-            alternative = false;
-            progress = 0;
         }
+        progress = 0;
         
         
         MiniHttpClient.HttpResult hte = hc.get(url);
-        total = 0;
+        long total = 0;
         
         try(InputStream in = (
                 f.fileType > 0 ? 

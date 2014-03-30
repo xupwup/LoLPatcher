@@ -1,6 +1,7 @@
 package lolpatcher;
 
 import java.io.BufferedOutputStream;
+import java.io.EOFException;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
@@ -25,6 +26,7 @@ public class RAFArchive {
     File datRaf;
     OutputStream out;
     long currentindex;
+    boolean changed = false;
     ArrayList<RafFile> fileList;
     HashMap<String, RafFile> dictionary;
     
@@ -130,6 +132,7 @@ public class RAFArchive {
      * @throws IOException 
      */
     public void writeFile(String path, InputStream in, PatchTask patcher) throws IOException{
+        changed = true;
         RafFile rf = new RafFile(currentindex, path);
         fileList.add(rf);
         rf.pathlistindex = fileList.size()-1;
@@ -182,18 +185,22 @@ public class RAFArchive {
      * Writes the .raf file itself
      */
     public void close() throws IOException{
+        out.close();
+        if(!changed){
+            return;
+        }
         raf.createNewFile();
         try (OutputStream rafOut = new BufferedOutputStream(new FileOutputStream(raf))){
             rafOut.write(getIntBytes(0x18be0ef0)); // magic number
             rafOut.write(getIntBytes(1)); // raf version
-            
+
             rafOut.write(getIntBytes(0)); // raf manager index (why zero??)
-            
+
             rafOut.write(getIntBytes(20)); // File list offset
             rafOut.write(getIntBytes(20 + 4 + fileList.size() * 16)); // Path list offset
-            
+
             rafOut.write(getIntBytes(fileList.size())); // count of file entries
-            
+
             Collections.sort(fileList, new Comparator<RafFile>(){
                 @Override
                 public int compare(RafFile o1, RafFile o2) {
@@ -215,14 +222,14 @@ public class RAFArchive {
                 rafOut.write(getIntBytes(f.size)); // size
                 rafOut.write(getIntBytes(pathlistindex++)); // path list index
             }
-            
+
             int stringSum = 0;
             for(RafFile f : fileList){
                 stringSum += f.name.getBytes().length + 1; // include nul byte
             }
             rafOut.write(getIntBytes(stringSum)); // path list size
             rafOut.write(getIntBytes(fileList.size())); // path list count
-            
+
             int pathOffset = 8 + fileList.size() * 8;
             for(RafFile f : fileList){
                 rafOut.write(getIntBytes(pathOffset)); // path offset
@@ -237,7 +244,7 @@ public class RAFArchive {
         } catch (FileNotFoundException ex) {
             Logger.getLogger(RAFArchive.class.getName()).log(Level.SEVERE, null, ex);
         }
-        out.close();
+        
     }
     
     
@@ -275,13 +282,17 @@ public class RAFArchive {
         return sb.toString();
     }
     
+    public InputStream readFile(RafFile selectedFile) throws IOException{
+        return new RafFileInputStream(selectedFile);
+    }
+    
     public InputStream readFile(String path) throws IOException{
         RafFile selectedFile = dictionary.get(path);
         if(selectedFile == null){
             throw new FileNotFoundException("\"" + path +"\" was not found in archive " + raf.getPath());
         }
         
-        return new RafFileInputStream(selectedFile);
+        return readFile(selectedFile);
     }
     
     private class RafFileInputStream extends InputStream{
@@ -315,6 +326,9 @@ public class RAFArchive {
                 return -1;
             }
             int read = in.read(b, off, Math.min(length, len));
+            if(read == -1){
+                throw new EOFException("Unexpected end of file");
+            }
             length -= read;
             return read;
         }
@@ -324,4 +338,32 @@ public class RAFArchive {
             return read(b, 0, b.length);
         }
     }
+    
+    public static void main(String[] args) throws IOException{
+        String fname = "DATA/Sounds/FMOD/GameAmbientEvent_bank00.fsb";
+        File f11 = new File("RADS/projects/lol_game_client/filearchives/0.0.0.161/temp/Archive_1.raf");
+        File f12 = new File("RADS/projects/lol_game_client/filearchives/0.0.0.161/temp/Archive_1.raf.dat");
+        File f21 = new File("RADS/projects/lol_game_client/filearchives/0.0.0.161/Archive_1.raf");
+        File f22 = new File("RADS/projects/lol_game_client/filearchives/0.0.0.161/Archive_1.raf.dat");
+        RAFArchive a1 = new RAFArchive(f11, f12);
+        RAFArchive a2 = new RAFArchive(f21, f22);
+        InputStream in1 = a1.readFile(fname);
+        InputStream in2 = a2.readFile(fname);
+        System.out.println(a1.dictionary.get(fname).size);
+        System.out.println(a2.dictionary.get(fname).size);
+        byte[] bytes = new byte[10];
+        int i = 0;
+        while(true){
+            int r1 = in1.read();
+            int r2 = in2.read();
+            if(r1 != r2){
+                System.out.println("omg not the same " + r1 + " " + r2 + " idx=" + i);
+            }
+            if(r1 == -1 && r2 == -1){
+                break;
+            }
+            i++;
+        }
+    }
 }
+

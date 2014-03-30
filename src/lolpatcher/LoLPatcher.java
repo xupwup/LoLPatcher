@@ -46,6 +46,7 @@ public class LoLPatcher extends PatchTask{
     
     
     public final boolean ignoreS_OK, force;
+    public boolean forceSingleFiles = false;
     private FilenameFilter filter;
     
     private HashMap<String, RAFArchive> archives;
@@ -87,9 +88,9 @@ public class LoLPatcher extends PatchTask{
     
     @Override
     public void patch() throws MalformedURLException, IOException, NoSuchAlgorithmException{
-        if(new java.io.File("RADS/"+type + "/" + project + "/releases/"
-                + targetVersion + "/S_OK").exists() && !ignoreS_OK){
-            
+        boolean S_OKExists = new java.io.File("RADS/"+type + "/" + project + "/releases/"
+                + targetVersion + "/S_OK").exists();
+        if(S_OKExists && !ignoreS_OK){
             done = true;
             return;
         }
@@ -98,6 +99,9 @@ public class LoLPatcher extends PatchTask{
         java.io.File target = new java.io.File("RADS/" + type + "/" + project + "/releases/");
         
         if(target.exists()){
+            if(!S_OKExists){
+                forceSingleFiles = true;
+            }
             String[] list = target.list(new FilenameFilter() {
                                 @Override
                                 public boolean accept(java.io.File dir, String name) {
@@ -260,6 +264,8 @@ public class LoLPatcher extends PatchTask{
     }
     
     private boolean needPatch(File f, ReleaseManifest oldmf) throws IOException{
+        if(force) return true;
+        
         if(f.fileType == 22 || f.fileType == 6){
             RAFArchive archive = getArchive(f.release);
             boolean res = archive.dictionary.get(f.path + f.name) == null;
@@ -268,7 +274,7 @@ public class LoLPatcher extends PatchTask{
             }
             return res;
         }else{
-            if(oldmf != null && !force){
+            if(oldmf != null && !forceSingleFiles){
                 File oldFile = oldmf.getFile(f.path + f.name);
                 if(oldFile != null && Arrays.equals(oldFile.checksum, f.checksum)
                         && new java.io.File(getFileDir(f), f.name).exists()){
@@ -312,13 +318,10 @@ public class LoLPatcher extends PatchTask{
                     return name.matches("Archive_[0-9]+\\.raf");
                 }
             });
-            if(files.length > 0 && !force){
+            if(files.length > 0){
                 rd = new RAFArchive(new java.io.File(folder+ files[0]), new java.io.File(folder+ files[0] + ".dat"));
                 archives.put(s, rd);
                 return rd;
-            }else if (files.length > 0){
-                deleteDir(new java.io.File(folder));
-                new java.io.File(folder).mkdirs();
             }
             try {
                 rd = new RAFArchive(folder + filename);

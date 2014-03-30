@@ -99,7 +99,7 @@ public class ArchivePurgeTask extends PatchTask {
         
         // nothing to do
         if(source.fileList.size() == ar.files.size()){
-            return;
+            //return;
         }
         
         tempDir.mkdir();
@@ -110,19 +110,39 @@ public class ArchivePurgeTask extends PatchTask {
             ReleaseManifest.File f = ar.files.get(i);
             archivePercentage = (float) i / ar.files.size();
             currentFile = f.name;
+            
             try (InputStream in = source.readFile(f.path + f.name)) {
                 target.writeFile(f.path + f.name, in, this);
-                if(done) return;
+                if(done){
+                    System.out.println("exited archive purge task");
+                    return;
+                }
+            }
+            int olen = source.dictionary.get(f.path + f.name).size;
+            int nlen = target.dictionary.get(f.path + f.name).size;
+            if(nlen != olen){
+                throw new IOException("Size mismatch:" + nlen + " " + olen);
             }
         }
         target.close();
+        source.close();
         if(target.fileList.isEmpty()){
             LoLPatcher.deleteDir(folder);
         }else{
-            sourceRaf.delete();
-            sourceRafDat.delete();
-            new File(folderName + "/temp/Archive_1.raf").renameTo(sourceRaf);
-            new File(folderName + "/temp/Archive_1.raf.dat").renameTo(sourceRafDat);
+            
+            if(!sourceRaf.delete()){
+                throw new IOException("Delete failed for " + folderName + archives[0]);
+            }
+            if(!sourceRafDat.delete()){
+                throw new IOException("Delete failed for " + folderName + archives[0]+".dat");
+            }
+            if(!new File(folderName + "/temp/Archive_1.raf").renameTo(new File(folder,"Archive_1.raf"))){
+                throw new IOException("Move failed for " + folderName + "temp/Archive_1.raf");
+            }
+            if(!new File(folderName + "/temp/Archive_1.raf.dat").renameTo(new File(folder,"Archive_1.raf.dat"))){
+                throw new IOException("Move failed for " + folderName + "temp/Archive_1.raf.dat");
+            }
+                   
             new File(folderName + "/temp/").delete();
         }
     }

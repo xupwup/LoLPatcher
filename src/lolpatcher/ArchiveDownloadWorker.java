@@ -1,11 +1,6 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
-
 package lolpatcher;
 
+import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.logging.Level;
@@ -43,11 +38,29 @@ public class ArchiveDownloadWorker extends Worker{
                     progress = 0;
                     RAFArchive archive = patcher.getArchive(task.versionName);
                     for(int i = 0; i < task.files.size(); i++){
-                        if(patcher.done){
+                        if(patcher.done || patcher.error != null){
                             break;
                         }
                         ReleaseManifest.File file = task.files.get(i);
                         current = file.name;
+                        RAFArchive.RafFile raff = archive.dictionary.get(file.path + file.name);
+                        
+                        if(raff != null){
+                            alternative = true;
+                            InputStream in = archive.readFile(raff);
+                            if(file.fileType == 22){
+                                in = new InflaterInputStream(in);
+                            }
+                            if(checkHash(new BufferedInputStream(in), patcher, file, false)){
+                                progress = (float) i / task.files.size();
+                                continue;
+                            }else{
+                                System.out.println("bad file: " + file);
+                                archive.fileList.remove(raff);
+                                archive.dictionary.remove(file.path + file.name);
+                            }
+                        }
+                        alternative = false;
                         downloadFileToArchive(file, htc, archive);
                         progress = (float) i / task.files.size();
                     }

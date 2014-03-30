@@ -44,6 +44,13 @@ public class ReleaseManifest {
         String path;
         byte[] checksum;
         int size;
+
+        @Override
+        public String toString() {
+            return path + name + " " +release + " type:" + fileType + " u2:" + unknown2 + " u3:"+unknown3 + " u4:" + unknown4;
+        }
+        
+        
         
         /**
          * 6 = uncompressed - archive
@@ -67,7 +74,7 @@ public class ReleaseManifest {
             this.checksum = checksum;
             this.size = size;
             this.fileType = fileType;
-            if(fileType != 0 && fileType != 2 && fileType != 5 && fileType != 6 && fileType != 22){
+            if(fileType != 0 && fileType != 2 && fileType != 5 && fileType != 6 && fileType != 22 && fileType != 4){
                 System.out.println("Hmm... fileType = " + fileType + " (" + name + ")");
             }
             this.unknown2 = unknown2;
