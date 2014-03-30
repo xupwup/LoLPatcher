@@ -338,32 +338,5 @@ public class RAFArchive {
             return read(b, 0, b.length);
         }
     }
-    
-    public static void main(String[] args) throws IOException{
-        String fname = "DATA/Sounds/FMOD/GameAmbientEvent_bank00.fsb";
-        File f11 = new File("RADS/projects/lol_game_client/filearchives/0.0.0.161/temp/Archive_1.raf");
-        File f12 = new File("RADS/projects/lol_game_client/filearchives/0.0.0.161/temp/Archive_1.raf.dat");
-        File f21 = new File("RADS/projects/lol_game_client/filearchives/0.0.0.161/Archive_1.raf");
-        File f22 = new File("RADS/projects/lol_game_client/filearchives/0.0.0.161/Archive_1.raf.dat");
-        RAFArchive a1 = new RAFArchive(f11, f12);
-        RAFArchive a2 = new RAFArchive(f21, f22);
-        InputStream in1 = a1.readFile(fname);
-        InputStream in2 = a2.readFile(fname);
-        System.out.println(a1.dictionary.get(fname).size);
-        System.out.println(a2.dictionary.get(fname).size);
-        byte[] bytes = new byte[10];
-        int i = 0;
-        while(true){
-            int r1 = in1.read();
-            int r2 = in2.read();
-            if(r1 != r2){
-                System.out.println("omg not the same " + r1 + " " + r2 + " idx=" + i);
-            }
-            if(r1 == -1 && r2 == -1){
-                break;
-            }
-            i++;
-        }
-    }
 }
 
