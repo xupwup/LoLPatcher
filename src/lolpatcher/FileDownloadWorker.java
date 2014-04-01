@@ -32,6 +32,7 @@ public class FileDownloadWorker extends Worker{
         try {
             try (MiniHttpClient htc = new MiniHttpClient("l3cdn.riotgames.com")) {
                 htc.throwExceptionWhenNot200 = true;
+                htc.setErrorHandler(defaultHttpErrorHandler);
                 
                 ReleaseManifest.File task;
                 while(true){

@@ -99,9 +99,6 @@ public class LoLPatcher extends PatchTask{
         java.io.File target = new java.io.File("RADS/" + type + "/" + project + "/releases/");
         
         if(target.exists()){
-            if(!S_OKExists){
-                forceSingleFiles = true;
-            }
             String[] list = target.list(new FilenameFilter() {
                                 @Override
                                 public boolean accept(java.io.File dir, String name) {
@@ -123,6 +120,8 @@ public class LoLPatcher extends PatchTask{
                 if(oldDir.renameTo(newname)){
                     if(new java.io.File(newname, "S_OK").delete()){ // only use old manifest if S_OK existed
                         oldmf = new ReleaseManifest(new java.io.File(newname, "releasemanifest"));
+                    }else{
+                        forceSingleFiles = true;
                     }
                 }else{
                     throw new IOException("New release version already exists! Rename failed from " + old + " to " + targetVersion);

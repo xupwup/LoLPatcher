@@ -9,6 +9,7 @@ import java.util.Arrays;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import static lolpatcher.PatchTask.speedStat;
+import nl.xupwup.Util.MiniHttpClient;
 
 /**
  *
@@ -19,6 +20,13 @@ public abstract class Worker extends Thread{
     public long startTime = -1;
     String current;
     boolean alternative; // for example true when hashing, false when downloading
+    MiniHttpClient.ErrorHandler<Exception> defaultHttpErrorHandler = new MiniHttpClient.ErrorHandler<Exception>() {
+        @Override
+        public int handle(Exception t) {
+            System.out.println("Connection issues... retrying in 5 sec");
+            return 5000;
+        }
+    };
     
     
     protected boolean checkHash(InputStream in, LoLPatcher patcher, ReleaseManifest.File f, boolean updateProgress) {

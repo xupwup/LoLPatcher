@@ -25,6 +25,7 @@ public class ArchiveDownloadWorker extends Worker{
         try {
             try (MiniHttpClient htc = new MiniHttpClient("l3cdn.riotgames.com")) {
                 htc.throwExceptionWhenNot200 = true;
+                htc.setErrorHandler(defaultHttpErrorHandler);
                 
                 LoLPatcher.Archive task;
                 while(true){

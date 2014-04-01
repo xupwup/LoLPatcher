@@ -31,5 +31,5 @@ void main() {
     }
     col /= samples * samples;
     col.a = 1;
-    gl_FragColor = col * 0.4 + color * 0.6;
+    gl_FragColor = col * 0.3 + color * 0.7;
 }

@@ -3,6 +3,7 @@ package lolpatcher;
 import java.awt.Font;
 import java.awt.Point;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
@@ -12,6 +13,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import nl.xupwup.Util.Color;
 import nl.xupwup.Util.GLFramework;
+import nl.xupwup.Util.ShaderProgram;
 import nl.xupwup.Util.TextRenderer;
 import nl.xupwup.WindowManager.Component;
 import nl.xupwup.WindowManager.Components.Button;
@@ -42,6 +44,7 @@ public class Main extends GLFramework {
     Window repairWindow;
     boolean purgeAfterwards = false;
     boolean changeRegionSettings = false;
+    private ShaderProgram progressBarShader;
     
     float playw, playh, playx, playy, repairw;
     
@@ -59,7 +62,6 @@ public class Main extends GLFramework {
         
         
         patchers.add(new ConfigurationTask(this));
-        
         patcher = null;
         currentPatcher = -1;
     }
@@ -127,7 +129,13 @@ public class Main extends GLFramework {
         } catch (IOException ex) {
             Logger.getLogger(Main.class.getName()).log(Level.SEVERE, null, ex);
         }
-        
+        try {
+            progressBarShader = ShaderProgram.getFromStream(
+                    ClassLoader.class.getResourceAsStream("/lolpatcher/resources/pbr.frag"),
+                    ClassLoader.class.getResourceAsStream("/lolpatcher/resources/pbr.vert"));
+        } catch (IOException ex) {
+            Logger.getLogger(Main.class.getName()).log(Level.SEVERE, null, ex);
+        }
         rerun();
     }
 
@@ -208,12 +216,10 @@ public class Main extends GLFramework {
             PatchTask lp = patcher;
             String currentFile = lp.currentFile;
             int speed = LoLPatcher.speed;
-            float percentage = Math.max(0.01f, lp.getPercentage());
+            float percentage = lp.getPercentage();
 
             long spent = (System.currentTimeMillis() - patcherStartTime);
-            int etaSec = (int) (spent / (10 * percentage)) - (int) (spent / 1000);
-            int etaMin = etaSec / 60;
-            etaSec -= etaMin * 60;
+            
             int texth = newsHeight + 5;
             
             if(currentFile != null && !patcher.done){
@@ -222,31 +228,48 @@ public class Main extends GLFramework {
             tr.draw("Task: " + (currentPatcher + 1) + "/" + patchers.size(), 5, texth);
             if(!patcher.done){
                 tr.draw(speed + " KiB/s", 100, texth);
-                String esec = "" + etaSec;
-                if(esec.length() == 1) { // leading zeros
-                    esec = "0" + esec;
+                if(percentage > 0){
+                    int etaSec = (int) (spent / (10 * percentage)) - (int) (spent / 1000);
+                    int etaMin = etaSec / 60;
+                    etaSec -= etaMin * 60;
+                    String esec = "" + etaSec;
+                    if(esec.length() == 1) { // leading zeros
+                        esec = "0" + esec;
+                    }
+                    tr.draw("Remaining: " + etaMin + ":" + esec, 240, texth);
                 }
-                tr.draw("Remaining: " + etaMin + ":" + esec, 240, texth);
             }
             int bary = texth + tr.getHeight();
             int barh = 10;
 
             // progress bar
             int xoff = 5;
+
             glBegin(GL_QUADS);
                 glVertex2i(xoff, bary);
                 glVertex2i(xoff, bary + barh);
                 glVertex2i(600 - xoff, bary + barh);
                 glVertex2i(600 - xoff, bary);
             glEnd();
-            Color.WHITE.bind();
+
+            progressBarShader.enable();
             glBegin(GL_QUADS);
-                glVertex2f(2 + xoff, bary + 2);
-                glVertex2f(2 + xoff, bary + barh - 2);
-                glVertex2f(xoff + 2 + (598 - 2 * xoff - 2) * (percentage / 100), bary + barh - 2);
-                glVertex2f(xoff + 2 + (598 - 2 * xoff - 2) * (percentage / 100), bary + 2);
+            {
+                float t = (System.currentTimeMillis() % 3000) / 3000f;
+                if(patcher != null && patcher.error == null && patcher.done && currentPatcher == patchers.size() - 1){
+                    t = 0;
+                }
+                glColor4f(percentage / 100, t, 0, 0);
+                glVertex2f(1 + xoff, bary + 1);
+                glColor4f(percentage / 100, t, 0, 1);
+                glVertex2f(1 + xoff, bary + barh - 1);
+                glColor4f(percentage / 100, t, 1, 1);
+                glVertex2f(xoff + 1 + (598 - 2 * xoff ) * (percentage / 100), bary + barh - 1);
+                glColor4f(percentage / 100, t, 1, 0);
+                glVertex2f(xoff + 1 + (598 - 2 * xoff ) * (percentage / 100), bary + 1);
+            }
             glEnd();
-            
+            progressBarShader.disable();
             if(lp instanceof LoLPatcher){
                 LoLPatcher ptch = (LoLPatcher) lp;
                 if(ptch.workers != null){
@@ -264,7 +287,6 @@ public class Main extends GLFramework {
                     }
                 }
             }
-            
         }
         
         
@@ -359,7 +381,7 @@ public class Main extends GLFramework {
         if(!patchers.get(currentPatcher).done){
             patchers.get(currentPatcher).done = true;
             try {
-                patchers.get(currentPatcher).join();
+                patchers.get(currentPatcher).join(2000);
             } catch (InterruptedException ex) {
                 Logger.getLogger(Main.class.getName()).log(Level.SEVERE, null, ex);
             }

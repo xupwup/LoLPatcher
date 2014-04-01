@@ -22,6 +22,8 @@ public class MiniHttpClient implements AutoCloseable {
     public HttpResult lastResult;
     public boolean throwExceptionWhenNot200 = false;
     
+    private ErrorHandler<Exception> errorHandler = null;
+    
     public MiniHttpClient(String server) throws IOException{
         this(server, false);
     }
@@ -67,41 +69,103 @@ public class MiniHttpClient implements AutoCloseable {
         close = true;
     }
     
-    /**
-     * Issues a get request and flushes the last returned response object.
-     * @param url  Relative urls only! For example "/test.html"
-     * @return HTTPResult object
-     * @throws IOException 
-     */
-    public HttpResult get(String url) throws IOException{
+    
+    
+    public void setErrorHandler(ErrorHandler<Exception> handler){
+        errorHandler = handler;
+    }
+   
+    
+    private void reopenSocket() throws IOException{
+        boolean error;
+        do{
+            try{
+                if(sock != null){
+                    close();
+                }
+                sock = new Socket(server, port);
+                in = new BufferedInputStream(sock.getInputStream());
+                os = new BufferedOutputStream(sock.getOutputStream());
+                error = false;
+            }catch(IOException e){
+                int handle = -1;
+                if(errorHandler == null || (handle = errorHandler.handle(e)) == -1){
+                    throw e;
+                }
+                error = true;
+                if(handle != -1){
+                    try {
+                        Thread.sleep(handle);
+                    } catch (InterruptedException ex) {
+                        throw new IOException(ex);
+                    }
+                }
+            }
+        }while(error);
+        
+    }
+    
+    private HttpResult get2(String url, long offset) throws IOException{
+        boolean error = false;
         if(lastResult != null){
-            readEverything(lastResult.in); // make sure everything is read, 
-                                             // so we dont read old data instead of headers
+            try{
+                readEverything(lastResult.in); // make sure everything is read, 
+                                               // so we dont read old data instead of headers
+            }catch(IOException e){
+                close = true; // reopen the socket
+            }
         }
         
         if(close || sock.isClosed()){
-            if(sock != null){
-                close();
-            }
-            sock = new Socket(server, port);
-            in = new BufferedInputStream(sock.getInputStream());
-            os = new BufferedOutputStream(sock.getOutputStream());
+            reopenSocket();
         }
         close = closeConnection;
         
-        sendRequest(os, "GET " + url + " HTTP/1.1", 
-                "Host: " + server,
-                "Accept: text/html", 
-                "Content-Length: 0",
-                "Connection: " + (closeConnection ? "close" : "keep-alive"),
-                "User-Agent: rickHttpClient"
-        );
-        os.flush();
+        byte[] left = null;
+        ArrayList<String> headers = new ArrayList<>();
+        do{
+            try{
+                if(offset > 0){
+                    sendRequest(os, "GET " + url + " HTTP/1.1", 
+                        "Host: " + server,
+                        "Accept: text/html", 
+                        "Content-Length: 0",
+                        "Connection: " + (closeConnection ? "close" : "keep-alive"),
+                        "User-Agent: rickHttpClient",
+                        "Range: bytes=" + offset + "-"
+                    );
+                }else{
+                    sendRequest(os, "GET " + url + " HTTP/1.1", 
+                        "Host: " + server,
+                        "Accept: text/html", 
+                        "Content-Length: 0",
+                        "Connection: " + (closeConnection ? "close" : "keep-alive"),
+                        "User-Agent: rickHttpClient"
+                    );
+                }
+                os.flush();
+                left = getHeaders(in, headers);
+                error = false;
+            }catch(IOException e){
+                int handle = -1;
+                if(errorHandler == null || (handle = errorHandler.handle(e)) == -1){
+                    throw e;
+                }
+                error = true;
+                if(handle != -1){
+                    try {
+                        Thread.sleep(handle);
+                    } catch (InterruptedException ex) {
+                        throw new IOException(ex);
+                    }
+                }
+                reopenSocket();
+            }
+        }while(error);
+
+        
         boolean chunked = false;
         
-        ArrayList<String> headers = new ArrayList<>();
-        
-        byte[] left = getHeaders(in, headers);
 
         int length = -1;
         for(String header : headers){
@@ -129,10 +193,23 @@ public class MiniHttpClient implements AutoCloseable {
         }else{
             httpStream = new HTTPInputStream(left, in, length);
         }
-        lastResult = new HttpResult(httpStream, headers, status);
-        if(status != 200 && throwExceptionWhenNot200){
+        HttpResult res = new HttpResult(httpStream, headers, status, url);
+        if(!(offset == 0 && status == 200 || offset > 0 && status == 206 ) && throwExceptionWhenNot200){
             throw new IOException(headers.get(0) + ", for url: " + url);
         }
+        return res;
+    }
+    
+    /**
+     * Issues a get request and flushes the last returned response object.
+     * @param url  Relative urls only! For example "/test.html"
+     * @return HTTPResult object
+     * @throws IOException 
+     * @throws java.lang.InterruptedException 
+     */
+    public HttpResult get(String url) throws IOException{
+        HttpResult res = get2(url, 0);
+        lastResult = new HttpResult(new InputStreamWrapper(res), res.headers, res.code, res.url);
         return lastResult;
     }
     
@@ -200,8 +277,9 @@ public class MiniHttpClient implements AutoCloseable {
         public final List<String> headers;
         public final InputStream in;
         public final int code;
+        String url;
         
-        private HttpResult(InputStream in, List<String> headers, int code){
+        private HttpResult(InputStream in, List<String> headers, int code, String url){
             this.headers = headers;
             this.in = in;
             this.code = code;
@@ -351,5 +429,80 @@ public class MiniHttpClient implements AutoCloseable {
         public int read(byte[] bytes) throws IOException {
             return read(bytes, 0, bytes.length);
         }
+    }
+    
+    private class InputStreamWrapper extends InputStream{
+
+        InputStream in;
+        long offset = 0;
+        boolean acceptRanges = false;
+        HttpResult res;
+        
+
+        /**
+         * @param res 
+         */
+        public InputStreamWrapper(HttpResult res) {
+            this.in = res.in;
+            this.res = res;
+            for(String header : res.headers){
+                if(header.toLowerCase().trim().startsWith("accept-ranges:") &&
+                        header.substring("accept-ranges:".length()).trim().equals("bytes")){
+                    
+                    acceptRanges = true;
+                    break;
+                }
+            }
+            
+        }
+        
+        @Override
+        public int read() throws IOException {
+            byte[] b = new byte[1];
+            int r = read(b);
+            if(r == -1){
+                return r;
+            }else{
+                return b[0];
+            }
+        }
+
+        @Override
+        public int read(byte[] b, int off, int len) throws IOException {
+            while(true){
+                try{
+                    int rd = in.read(b, off, len);
+                    offset+= rd;
+                    return rd;
+                }catch(IOException e){
+                    int handle;
+                    if(!acceptRanges || errorHandler == null || (handle = errorHandler.handle(e)) == -1){
+                        throw e;
+                    }
+                    try {
+                        Thread.sleep(handle);
+                    } catch (InterruptedException ex) {
+                        throw new IOException("Interrupted exception while reading", e);
+                    }
+                    HttpResult r2 = get2(res.url, offset);
+                    in = r2.in;
+                }
+            }
+        }
+
+        @Override
+        public int read(byte[] b) throws IOException {
+            return read(b, 0, b.length);
+        }
+        
+    }
+    
+    public static abstract class ErrorHandler<T>{
+        /**
+         * 
+         * @param t
+         * @return how long we should wait to try again. -1 to indicate no retry
+         */
+        public abstract int handle(T t);
     }
 }
