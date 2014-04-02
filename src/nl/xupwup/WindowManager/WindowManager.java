@@ -1,7 +1,3 @@
-/*
- * To change this template, choose Tools | Templates
- * and open the template in the editor.
- */
 package nl.xupwup.WindowManager;
 
 import nl.xupwup.Util.FrameBuffer;
@@ -119,6 +115,18 @@ public class WindowManager {
             }
         }
         release();
+        return false;
+    }
+    
+    public boolean hitTest(int x, int y){
+        for(int i = windows.size()-1; i >=0; i--){
+            Window w = windows.get(i);
+            if((x < w.location.x + w.getSize().x && x > w.location.x) &&
+               (y < w.location.y + w.getSize().y && y > w.location.y)){
+
+                return true;
+            }
+        }
         return false;
     }
     

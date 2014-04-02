@@ -3,7 +3,6 @@ package lolpatcher;
 import java.awt.Font;
 import java.awt.Point;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
@@ -183,7 +182,7 @@ public class Main extends GLFramework {
         
         
         
-        int newsHeight = news.draw() + 5;
+        int newsHeight = news.draw(Mouse.getX(), (int) (windowSize.y - Mouse.getY()), !wm.hitTest(Mouse.getX(), (int) (windowSize.y - Mouse.getY()))) + 5;
         glColor3f(0.8f, 0.8f, 0.8f);
         glBegin(GL_QUADS);
             glVertex2i(0, newsHeight);
@@ -396,8 +395,9 @@ public class Main extends GLFramework {
 
     @Override
     public void onClick(int x, int y) {
+        y = (int) (windowSize.y - y);
         if(patcher != null && patcher.error == null && patcher.done && currentPatcher == patchers.size() - 1){
-            y = (int) (windowSize.y - y);
+            
             if(x > playx && x < playx + playw &&
                     y > playy && y < playy + playh){
                 try {
@@ -415,6 +415,7 @@ public class Main extends GLFramework {
                 wm.addWindow(repairWindow);
             }
         }
+        news.click(x, y);
     }
 
     @Override

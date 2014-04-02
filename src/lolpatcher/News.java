@@ -1,12 +1,14 @@
 package lolpatcher;
 
+import java.awt.Desktop;
 import java.awt.Font;
 import java.awt.image.BufferedImage;
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URISyntaxException;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.Properties;
 import java.util.logging.Level;
@@ -55,7 +57,28 @@ public class News {
     float targetShift = 0;
     long shiftStart = 0;
     
-    public int draw(){
+    public void click(int mousex, int mousey){
+        int idx = mousey / bold.getHeight();
+        if(idx < newsItems.size()){
+            loadUrl(newsItems.get(idx).url);
+        }
+        
+        if(mousey > bold.getHeight() * newsItems.size() + 15 && mousey < bold.getHeight() * newsItems.size() + 15 + bold.getHeight()){
+            loadUrl(communityItems.get(Math.round(currentShift)).link);
+        }
+        
+    }
+    
+    private void loadUrl(String u){
+        try {
+            Desktop.getDesktop().browse(new URL(u).toURI());
+        } catch (IOException | URISyntaxException ex) {
+            Logger.getLogger(News.class.getName()).log(Level.SEVERE, null, ex);
+        }
+    }
+    
+    
+    public int draw(int mousex, int mousey, boolean allowHighlight){
         if(genTextures){
             genTextures();
             readyForDrawing = true;
@@ -71,7 +94,11 @@ public class News {
             glColor3f(0.8f, 0.8f,0.8f);
             bold.draw(ni.date, 0, index);
             
-            Color.WHITE.bind();
+            if(mousey > index && mousey < index + bold.getHeight() && allowHighlight){
+                glColor3f(0.5f, 0.5f,1f);
+            }else{
+                Color.WHITE.bind();
+            }
             normal.draw(ni.title, datew + 10, index);
             index += bold.getHeight();
         }
@@ -87,15 +114,15 @@ public class News {
             shiftStart = now;
         }
         currentShift = (10 * currentShift + targetShift) / 11;
-        
+        int rnd = Math.round(currentShift);
         int floor = (int) Math.floor(currentShift);
         int ceil = (int) Math.ceil(currentShift);
         
         float x = (-currentShift + floor) * 600;
-        communityItems.get(floor).draw((int) x + 1, index);
+        communityItems.get(floor).draw((int) x + 1, index, mousey > index + 5 && mousey < index + 5 + bold.getHeight() && rnd  == floor && allowHighlight);
         if(floor != ceil && ceil < communityItems.size()){
             x = (-currentShift + ceil) * 600;
-            communityItems.get(ceil).draw((int) x + 1, index);
+            communityItems.get(ceil).draw((int) x + 1, index, mousey > index + 5 && mousey < index + 5 + bold.getHeight() && rnd  == ceil && allowHighlight);
         }
         
         return index + communityItems.get(floor).imageTex.height;
@@ -121,7 +148,8 @@ public class News {
         String title;
         String promoText;
 
-        void draw(int x, int y){
+        void draw(int x, int y, boolean hl){
+            glColor4f(1,1,1,1);
             imageTex.draw(x, y);
             float texty = y + imageTex.height - normal.getHeight(promoText) - 10;
             glColor4f(0,0,0,0.4f);
@@ -138,8 +166,13 @@ public class News {
                 glVertex2f(x + imageTex.width, y + titleh + 5);
                 glVertex2f(x + imageTex.width, y);
             glEnd();
-            glColor4f(1,1,1,1);
+            if(hl){
+                glColor4f(0.5f,0.5f,1,1);
+            }else{
+                glColor4f(1,1,1,1);
+            }
             bold.draw(title, x + 5, y + 5);
+            glColor4f(1,1,1,1);
             normal.draw(promoText, x+5, texty + 5);
         }
         

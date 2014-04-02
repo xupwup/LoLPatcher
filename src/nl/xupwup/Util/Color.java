@@ -1,7 +1,3 @@
-/*
- * To change this template, choose Tools | Templates
- * and open the template in the editor.
- */
 package nl.xupwup.Util;
 
 import org.lwjgl.opengl.GL11;
@@ -19,6 +15,7 @@ public class Color {
     public static final Color BLUE = new Color(66,82,255);
     public static final Color RED = new Color(255,56,56);
     public static final Color PURPLE = new Color(153, 43, 255);
+    public static final Color YELLOW = new Color(255, 255, 0);
     
     
     public Color(float r, float g, float b){
