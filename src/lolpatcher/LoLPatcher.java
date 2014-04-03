@@ -49,7 +49,7 @@ public class LoLPatcher extends PatchTask{
     public boolean forceSingleFiles = false;
     private FilenameFilter filter;
     
-    private HashMap<String, RAFArchive> archives;
+    private final HashMap<String, RAFArchive> archives;
     float percentageInArchive;
     
     public RingBuffer<File> filesToPatch;
@@ -133,7 +133,9 @@ public class LoLPatcher extends PatchTask{
 
         currentFile = "Calculating differences";
         ArrayList<File> files = cullFiles(mf, oldmf);
-        
+        if(error != null){
+            return;
+        }
         currentFile = "Organizing files";
         
         int nrOfFiles = 0;
@@ -247,43 +249,28 @@ public class LoLPatcher extends PatchTask{
         return (filePart * (1 - percentageInArchive) + archivePart * percentageInArchive) * 100;
     }
     
-    private ArrayList<File> cullFiles(ReleaseManifest mf, ReleaseManifest oldmf) throws IOException{
-        ArrayList<File> files = new ArrayList<>();
-        for(File f : mf.files){
-            if(filter.accept(null, f.name) && needPatch(f, oldmf)){
-                files.add(f);
+    private ArrayList<File> cullFiles(ReleaseManifest mf, ReleaseManifest oldmf){
+        int cores = Runtime.getRuntime().availableProcessors();
+        DifferenceCalculator[] calculators = new DifferenceCalculator[cores];
+        int slicesize = 1 + mf.files.length / cores;
+        for(int i = 0; i < calculators.length; i++){
+            int off = slicesize * i;
+            int len = Math.max(0, Math.min(mf.files.length - off, slicesize));
+            calculators[i] = new DifferenceCalculator(this, mf, oldmf, filter, off, len);
+            calculators[i].start();
+        }
+        for(DifferenceCalculator c : calculators){
+            try {
+                c.join();
+            } catch (InterruptedException ex) {
+                Logger.getLogger(LoLPatcher.class.getName()).log(Level.SEVERE, null, ex);
             }
         }
-        Collections.sort(files, new Comparator<File>() {
-            @Override
-            public int compare(File o1, File o2) {
-                return Integer.compare(o1.releaseInt , o2.releaseInt);
-            }
-        });
-        return files;
-    }
-    
-    private boolean needPatch(File f, ReleaseManifest oldmf) throws IOException{
-        if(force) return true;
-        
-        if(f.fileType == 22 || f.fileType == 6){
-            RAFArchive archive = getArchive(f.release);
-            boolean res = archive.dictionary.get(f.path + f.name) == null;
-            if(res){
-                System.out.println("need patch " + f.name);
-            }
-            return res;
-        }else{
-            if(oldmf != null && !forceSingleFiles){
-                File oldFile = oldmf.getFile(f.path + f.name);
-                if(oldFile != null && Arrays.equals(oldFile.checksum, f.checksum)
-                        && new java.io.File(getFileDir(f), f.name).exists()){
-                    
-                    return false;
-                }
-            }
-            return true;
+        ArrayList<File>[] filesArr = new ArrayList[cores];
+        for(int i = 0; i < calculators.length; i++){
+            filesArr[i] = calculators[i].result;
         }
+        return DifferenceCalculator.mergeLists(filesArr);
     }
     
     private void managedFilesCleanup(ReleaseManifest mf){
@@ -320,12 +307,16 @@ public class LoLPatcher extends PatchTask{
             });
             if(files.length > 0){
                 rd = new RAFArchive(new java.io.File(folder+ files[0]), new java.io.File(folder+ files[0] + ".dat"));
-                archives.put(s, rd);
+                synchronized(archives){
+                    archives.put(s, rd);
+                }
                 return rd;
             }
             try {
                 rd = new RAFArchive(folder + filename);
-                archives.put(s, rd);
+                synchronized(archives){
+                    archives.put(s, rd);
+                }
             } catch (IOException ex) {
                 Logger.getLogger(LoLPatcher.class.getName()).log(Level.SEVERE, null, ex);
             }
