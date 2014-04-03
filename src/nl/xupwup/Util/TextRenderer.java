@@ -306,4 +306,25 @@ public class TextRenderer {
         }
         return sb2.toString();
     }
+    public static String trim(String toTrim, TextRenderer tr, int width){
+        StringBuilder sb = new StringBuilder();
+        int w = 0;
+        for(int i = 0; i < toTrim.length(); i++){
+            if(tr.getWidth(sb.toString() + toTrim.charAt(i)) <= width){
+                sb.append(toTrim.charAt(i));
+            }else{
+                return trim2(sb, tr, width);
+            }
+        }
+        return toTrim;
+    }
+    private static String trim2(StringBuilder toTrim, TextRenderer tr, int width){
+        while(tr.getWidth(toTrim.toString() + "...") > width){
+            if(toTrim.length() == 0){
+                return "";
+            }
+            toTrim.deleteCharAt(toTrim.length() - 1);
+        }
+        return toTrim.toString() + "...";
+    }
 }

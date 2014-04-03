@@ -14,6 +14,7 @@ import nl.xupwup.Util.Color;
 import nl.xupwup.Util.GLFramework;
 import nl.xupwup.Util.ShaderProgram;
 import nl.xupwup.Util.TextRenderer;
+import nl.xupwup.Util.Texture;
 import nl.xupwup.WindowManager.Component;
 import nl.xupwup.WindowManager.Components.Button;
 import nl.xupwup.WindowManager.Components.CheckBox;
@@ -30,7 +31,7 @@ import static org.lwjgl.opengl.GL11.*;
  * @author Rick Hendricksen
  */
 public class Main extends GLFramework {
-    public static final int patcherVersion = 11;
+    public static final int patcherVersion = 12;
     public List<PatchTask> patchers;
     int currentPatcher = -1;
     PatchTask patcher;
@@ -44,6 +45,7 @@ public class Main extends GLFramework {
     boolean purgeAfterwards = false;
     boolean changeRegionSettings = false;
     private ShaderProgram progressBarShader;
+    private Texture informationBackgroundTexture;
     
     float playw, playh, playx, playy, repairw;
     
@@ -132,6 +134,7 @@ public class Main extends GLFramework {
             progressBarShader = ShaderProgram.getFromStream(
                     ClassLoader.class.getResourceAsStream("/lolpatcher/resources/pbr.frag"),
                     ClassLoader.class.getResourceAsStream("/lolpatcher/resources/pbr.vert"));
+            informationBackgroundTexture = Texture.fromStream(ClassLoader.class.getResourceAsStream("/lolpatcher/resources/ibg.png"));
         } catch (IOException ex) {
             Logger.getLogger(Main.class.getName()).log(Level.SEVERE, null, ex);
         }
@@ -183,13 +186,19 @@ public class Main extends GLFramework {
         
         
         int newsHeight = news.draw(Mouse.getX(), (int) (windowSize.y - Mouse.getY()), !wm.hitTest(Mouse.getX(), (int) (windowSize.y - Mouse.getY()))) + 5;
-        glColor3f(0.8f, 0.8f, 0.8f);
+        glColor3f(1f, 1f, 1f);
+        informationBackgroundTexture.bind();
         glBegin(GL_QUADS);
+            glTexCoord2f(0, 0);
             glVertex2i(0, newsHeight);
+            glTexCoord2f(0, 200f / informationBackgroundTexture.height);
             glVertex2i(0, newsHeight + 200);
+            glTexCoord2f(600f / informationBackgroundTexture.height, 200f / informationBackgroundTexture.height);
             glVertex2i(600, newsHeight + 200);
+            glTexCoord2f(600f / informationBackgroundTexture.height, 0);
             glVertex2i(600, newsHeight);
         glEnd();
+        informationBackgroundTexture.unbind();
         Color.BLACK.bind();
         
         if(patcher != null){
@@ -358,21 +367,8 @@ public class Main extends GLFramework {
             return;
         }
         glColor3f(0, 0, 0);
-        smallText.draw(current, x, y+ 3);
-        glColor3f(0.8f, 0.8f, 0.8f);
-        float tw = smallText.getWidth(current);
-        if(tw > width){
-            glBegin(GL_QUAD_STRIP);
-                glColor4f(0.8f, 0.8f, 0.8f, 0);
-                glVertex2f(x + 0.9f*width, y + 3);
-                glVertex2f(x + 0.9f*width, y + 3 + smallText.getHeight());
-                glColor4f(0.8f, 0.8f, 0.8f, 1);
-                glVertex2f(x + width, y + 3);
-                glVertex2f(x + width, y + 3 + smallText.getHeight());
-                glVertex2f(x + tw, y + 3);
-                glVertex2f(x + tw, y + 3 + smallText.getHeight());
-            glEnd();
-        }
+        smallText.draw(TextRenderer.trim(current, smallText, width), x, y+ 3);
+
     }
     
     @Override
