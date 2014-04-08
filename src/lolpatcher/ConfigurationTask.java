@@ -175,7 +175,7 @@ public class ConfigurationTask extends PatchTask{
             return;
         }
         main.patchers.add(new LoLPatcher(main.airversion, "lol_air_client", branch, main.ignoreS_OK, main.force));
-        main.patchers.add(new LoLPatcher(gameversion, "lol_game_client", branch, true, true));//main.ignoreS_OK, main.force));
+        main.patchers.add(new LoLPatcher(gameversion, "lol_game_client", branch, main.ignoreS_OK, main.force));
         main.patchers.add(new LoLPatcher(airconfigversion, clientConfigName, branch, main.ignoreS_OK, main.force));
         main.patchers.add(new LoLPatcher(gamelanguageversion, "lol_game_client_"+language, branch, main.ignoreS_OK, main.force));
         main.patchers.add(new LoLPatcher(launcherVersion, "lol_launcher", branch, main.ignoreS_OK, main.force, new FilenameFilter() {
