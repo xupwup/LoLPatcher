@@ -6,6 +6,7 @@ import java.io.InputStream;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.zip.InflaterInputStream;
+import lolpatcher.manifest.ManifestFile;
 import nl.xupwup.Util.MiniHttpClient;
 
 /**
@@ -42,7 +43,7 @@ public class ArchiveDownloadWorker extends Worker{
                         if(patcher.done || patcher.error != null){
                             break;
                         }
-                        ReleaseManifest.File file = task.files.get(i);
+                        ManifestFile file = task.files.get(i);
                         current = file.name;
                         RAFArchive.RafFile raff = archive.dictionary.get(file.path + file.name);
                         
@@ -78,13 +79,16 @@ public class ArchiveDownloadWorker extends Worker{
         }
     }
     
-    private void downloadFileToArchive(ReleaseManifest.File f, MiniHttpClient hc, RAFArchive archive) throws IOException{
+    private void downloadFileToArchive(ManifestFile f, MiniHttpClient hc, RAFArchive archive) throws IOException{
         String url = "/releases/"+patcher.branch+"/"+patcher.type+"/"
             + patcher.project + "/releases/" + f.release + "/files/" + 
             f.path.replaceAll(" ", "%20") + f.name.replaceAll(" ", "%20") + (f.fileType > 0 ? ".compressed" : "");
+        
         MiniHttpClient.HttpResult hte = hc.get(url);
+        InputStream fileStream = hte.in;
+        
 
-        try(InputStream in = (f.fileType == 6 ? new InflaterInputStream(hte.in) : hte.in)){
+        try(InputStream in = (f.fileType == 6 ? new InflaterInputStream(fileStream) : fileStream)){
             archive.writeFile(f.path + f.name, in, patcher);
         }
     }

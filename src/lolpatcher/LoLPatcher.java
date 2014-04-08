@@ -1,5 +1,6 @@
 package lolpatcher;
 
+import lolpatcher.manifest.ReleaseManifest;
 import java.io.BufferedReader;
 import java.io.FilenameFilter;
 import java.io.IOException;
@@ -8,13 +9,12 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import lolpatcher.ReleaseManifest.File;
+import lolpatcher.manifest.ManifestFile;
 import nl.xupwup.Util.RingBuffer;
 
 /**
@@ -39,12 +39,11 @@ public class LoLPatcher extends PatchTask{
     String project;
     String branch;
     
-    public String type = "projects";
+    public final String type = "projects";
     
     Worker[] workers;
-   
     
-    
+    public float downloadPercentage = 0;
     public final boolean ignoreS_OK, force;
     public boolean forceSingleFiles = false;
     private FilenameFilter filter;
@@ -52,14 +51,14 @@ public class LoLPatcher extends PatchTask{
     private final HashMap<String, RAFArchive> archives;
     float percentageInArchive;
     
-    public RingBuffer<File> filesToPatch;
+    public RingBuffer<ManifestFile> filesToPatch;
     public RingBuffer<Archive> archivesToPatch;
     
     public static class Archive{
         String versionName;
-        ArrayList<File> files;
+        ArrayList<ManifestFile> files;
 
-        public Archive(String versionName, ArrayList<File> files) {
+        public Archive(String versionName, ArrayList<ManifestFile> files) {
             this.versionName = versionName;
             this.files = files;
         }
@@ -118,7 +117,10 @@ public class LoLPatcher extends PatchTask{
                 java.io.File oldDir = new java.io.File(target, old);
                 java.io.File newname = new java.io.File(target, targetVersion);
                 if(oldDir.renameTo(newname)){
-                    if(new java.io.File(newname, "S_OK").delete()){ // only use old manifest if S_OK existed
+                    if(S_OKExists){ // only use old manifest if S_OK existed
+                        if(!ignoreS_OK){
+                            new java.io.File(newname, "S_OK").delete();
+                        }
                         oldmf = new ReleaseManifest(new java.io.File(newname, "releasemanifest"));
                     }else{
                         forceSingleFiles = true;
@@ -132,16 +134,51 @@ public class LoLPatcher extends PatchTask{
         ReleaseManifest mf = ReleaseManifest.getReleaseManifest(project, targetVersion, branch, type);
 
         currentFile = "Calculating differences";
-        ArrayList<File> files = cullFiles(mf, oldmf);
+        ArrayList<ManifestFile> files = new ArrayList<>();
+        if(force || forceSingleFiles){
+            for(ManifestFile f : mf.files){
+                if(f.fileType == 6 || f.fileType == 22){
+                    if(force){
+                        files.add(f);
+                    }
+                }else if (forceSingleFiles || force){
+                    files.add(f);
+                }
+            }
+        }
         if(error != null){
             return;
         }
+        
+        
+        ArrayList<ManifestFile> cullFiles = cullFiles(mf, oldmf);
+        if(files.isEmpty()){
+            files = cullFiles;
+            System.out.println("cullfiles.length"+cullFiles.size());
+        }
+        if(cullFiles.size() > 0){
+            try{
+                currentFile = "Downloading Packages";
+                PackageDownloader ps = new PackageDownloader(targetVersion, project, branch);
+                ps.updateRanges(cullFiles);
+                files.removeAll(ps.downloadRanges(this));
+                downloadPercentage = 0;
+            }catch(IOException e){
+                e.printStackTrace();
+            }
+        }
+        Collections.sort(files, new Comparator<ManifestFile>() {
+            @Override
+            public int compare(ManifestFile o1, ManifestFile o2) {
+                return Integer.compare(o1.releaseInt , o2.releaseInt);
+            }
+        });
         currentFile = "Organizing files";
         
         int nrOfFiles = 0;
         int nrOfArchiveFiles = 0;
         
-        for(File f : files){
+        for(ManifestFile f : files){
             if(f.fileType == 22 || f.fileType == 6){
                 nrOfArchiveFiles++;
             }else{
@@ -154,10 +191,10 @@ public class LoLPatcher extends PatchTask{
         filesToPatch = new RingBuffer<>(nrOfFiles);
         
         Archive lastArchive = null;
-        for(File f : files){
+        for(ManifestFile f : files){
             if(f.fileType == 22 || f.fileType == 6){
                 if(lastArchive == null || !lastArchive.versionName.equals(f.release)){
-                    lastArchive = new Archive(f.release, new ArrayList<File>());
+                    lastArchive = new Archive(f.release, new ArrayList<ManifestFile>());
                     atp.add(lastArchive);
                 }
                 lastArchive.files.add(f);
@@ -173,6 +210,8 @@ public class LoLPatcher extends PatchTask{
         });
         archivesToPatch = new RingBuffer<>(atp.size());
         archivesToPatch.addAll(atp);
+
+        
         currentFile = "Patching Separate files";
         Worker[] workers2 = new FileDownloadWorker[6];
         for(int i = 0; i < workers2.length; i++){
@@ -205,7 +244,9 @@ public class LoLPatcher extends PatchTask{
             }
         }
         
-        
+        for(RAFArchive a : archives.values()){
+            a.close();
+        }
         
         managedFilesCleanup(mf);
         if(!done && error == null){
@@ -215,10 +256,16 @@ public class LoLPatcher extends PatchTask{
         }
     }
     
+    public void syncAllArchives() throws IOException{
+        for(RAFArchive a : archives.values()){
+            a.sync();
+        }
+    }
+    
     @Override
     public float getPercentage(){
         if(archivesToPatch == null){
-            return 0;
+            return 0 + downloadPercentage;
         }
         int total = filesToPatch.max();
         float finished = total - filesToPatch.size();
@@ -246,10 +293,10 @@ public class LoLPatcher extends PatchTask{
         if(total == 0){
             archivePart = 0;
         }
-        return (filePart * (1 - percentageInArchive) + archivePart * percentageInArchive) * 100;
+        return (filePart * (1 - percentageInArchive) + archivePart * percentageInArchive) * 100 + downloadPercentage;
     }
     
-    private ArrayList<File> cullFiles(ReleaseManifest mf, ReleaseManifest oldmf){
+    private ArrayList<ManifestFile> cullFiles(ReleaseManifest mf, ReleaseManifest oldmf){
         int cores = Runtime.getRuntime().availableProcessors();
         DifferenceCalculator[] calculators = new DifferenceCalculator[cores];
         int slicesize = 1 + mf.files.length / cores;
@@ -266,7 +313,7 @@ public class LoLPatcher extends PatchTask{
                 Logger.getLogger(LoLPatcher.class.getName()).log(Level.SEVERE, null, ex);
             }
         }
-        ArrayList<File>[] filesArr = new ArrayList[cores];
+        ArrayList<ManifestFile>[] filesArr = new ArrayList[cores];
         for(int i = 0; i < calculators.length; i++){
             filesArr[i] = calculators[i].result;
         }
@@ -279,7 +326,7 @@ public class LoLPatcher extends PatchTask{
             String[] versions = managedFileDir.list();
             for (String v : versions){
                 boolean found = false;
-                for(File f : mf.files){
+                for(ManifestFile f : mf.files){
                     if(f.fileType == 5 && f.release.equals(v)){
                         found = true;
                         break;
@@ -294,7 +341,7 @@ public class LoLPatcher extends PatchTask{
     
     public RAFArchive getArchive(String s) throws IOException{
         RAFArchive rd = archives.get(s);
-        if(!archives.containsKey(s)){
+        if(rd == null){
             String folder = "RADS/"+type + "/" + project + "/filearchives/"
                 + s + "/";
             new java.io.File(folder).mkdirs();
@@ -326,9 +373,9 @@ public class LoLPatcher extends PatchTask{
     
     
     
-    public final java.io.File getFileDir(File f){
-        return  new java.io.File("RADS/"+type + "/" + project + (f.fileType == 5 ? "/managedfiles/" : "/releases/")
-                + (f.fileType == 5 ? f.release : targetVersion) + (f.fileType == 5 ? "/" : "/deploy/") + f.path);
+    public final String getFileDir(ManifestFile f){
+        return "RADS/"+type + "/" + project + (f.fileType == 5 ? "/managedfiles/" : "/releases/")
+                + (f.fileType == 5 ? f.release : targetVersion) + (f.fileType == 5 ? "/" : "/deploy/") + f.path;
     }
     
     

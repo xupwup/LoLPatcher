@@ -1,4 +1,4 @@
-package lolpatcher;
+package lolpatcher.manifest;
 
 import java.io.BufferedInputStream;
 import java.io.FileInputStream;
@@ -21,14 +21,14 @@ public class ReleaseManifest {
     String releaseName;
     
     public Directory[] directories;
-    public File[] files;
-    private final HashMap<String, File> fileDictionary;
+    public ManifestFile[] files;
+    private final HashMap<String, ManifestFile> fileDictionary;
     
     
     
     public class Directory{
         public Directory[] subdirs;
-        public File[] files;
+        public ManifestFile[] files;
         public String name;
         public String path;
         public Directory(String name){
@@ -37,51 +37,7 @@ public class ReleaseManifest {
         }
     }
     
-    public class File{
-        String release;
-        int releaseInt;
-        String name;
-        String path;
-        byte[] checksum;
-        int size;
-
-        @Override
-        public String toString() {
-            return path + name + " " +release + " type:" + fileType + " u2:" + unknown2 + " u3:"+unknown3 + " u4:" + unknown4;
-        }
-        
-        
-        
-        /**
-         * 6 = uncompressed - archive
-         * 22 = compressed - archive
-         * 5 = managedfile
-         * greater than 0 = compressed
-         * 0 = normal file
-         * 2 = compressed file
-         * 4 = copy to sln?
-         */
-        int fileType;
-        int unknown2;
-        int unknown3;
-        int unknown4;
-        
-        public File(String release, int releaseInt, String name, byte[] checksum, int size,
-                int fileType, int unknown2, int unknown3, int unknown4) {
-            this.release = release;
-            this.releaseInt = releaseInt;
-            this.name = name;
-            this.checksum = checksum;
-            this.size = size;
-            this.fileType = fileType;
-            if(fileType != 0 && fileType != 2 && fileType != 5 && fileType != 6 && fileType != 22 && fileType != 4){
-                System.out.println("Hmm... fileType = " + fileType + " (" + name + ")");
-            }
-            this.unknown2 = unknown2;
-            this.unknown3 = unknown3;
-            this.unknown4 = unknown4;
-        }
-    }
+    
     
     
     
@@ -129,7 +85,7 @@ public class ReleaseManifest {
     }
     
     
-    public File getFile(String path){
+    public ManifestFile getFile(String path){
         return fileDictionary.get(path);
     }
     
@@ -242,10 +198,10 @@ public class ReleaseManifest {
                     directories[start + j].path = directories[i].path + directories[start + j].path;
                 }
             }
-            files = new File[fileMetaDatas.length];
+            files = new ManifestFile[fileMetaDatas.length];
             for(int i = 0; i < fileMetaDatas.length; i++){
                 FileMetaData meta = fileMetaDatas[i];
-                files[i] = new File(getReleaseName(meta.release),
+                files[i] = new ManifestFile(getReleaseName(meta.release),
                         meta.release,
                         strs[meta.nameindex],
                         meta.checksum, meta.size,
@@ -255,7 +211,7 @@ public class ReleaseManifest {
             // linking files to directories
             for(int i = 0; i < directoryMetaDatas.length; i++){
                 int start = directoryMetaDatas[i].firstfileIndex;
-                directories[i].files = new File[directoryMetaDatas[i].fileCount];
+                directories[i].files = new ManifestFile[directoryMetaDatas[i].fileCount];
                 
                 for(int j = 0; j < directoryMetaDatas[i].fileCount; j++){
                     directories[i].files[j] = files[start + j];
@@ -263,7 +219,7 @@ public class ReleaseManifest {
                 }
             }
             fileDictionary = new HashMap<>(files.length);
-            for(File fi : files){
+            for(ManifestFile fi : files){
                 fileDictionary.put(fi.path + fi.name, fi);
             }
         }
@@ -272,7 +228,7 @@ public class ReleaseManifest {
     @Override
     public String toString() {
         StringBuilder sb = new StringBuilder();
-        for(File f : files){
+        for(ManifestFile f : files){
             sb.append(f.path).append(f.name).append(" type:").append(f.fileType).append(" ").append(f.release).append("\n");
         }
         return sb.toString();

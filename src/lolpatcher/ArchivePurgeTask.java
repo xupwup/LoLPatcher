@@ -1,5 +1,6 @@
 package lolpatcher;
 
+import lolpatcher.manifest.ReleaseManifest;
 import java.io.File;
 import java.io.FilenameFilter;
 import java.io.IOException;
@@ -9,6 +10,7 @@ import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import lolpatcher.manifest.ManifestFile;
 
 /**
  *
@@ -37,21 +39,21 @@ public class ArchivePurgeTask extends PatchTask {
         
         ArrayList<LoLPatcher.Archive> archivesToPurge = new ArrayList<>();
         
-        ArrayList<ReleaseManifest.File> files = new ArrayList<>(mf.files.length);
+        ArrayList<ManifestFile> files = new ArrayList<>(mf.files.length);
         Collections.addAll(files, mf.files);
         
-        Collections.sort(files, new Comparator<ReleaseManifest.File>() {
+        Collections.sort(files, new Comparator<ManifestFile>() {
             @Override
-            public int compare(ReleaseManifest.File o1, ReleaseManifest.File o2) {
+            public int compare(ManifestFile o1, ManifestFile o2) {
                 return Integer.compare(o1.releaseInt , o2.releaseInt);
             }
         });
         
         LoLPatcher.Archive lastArchive = null;
-        for(ReleaseManifest.File f : files){
+        for(ManifestFile f : files){
             if(f.fileType == 22 || f.fileType == 6){
                 if(lastArchive == null || !lastArchive.versionName.equals(f.release)){
-                    lastArchive = new LoLPatcher.Archive(f.release, new ArrayList<ReleaseManifest.File>());
+                    lastArchive = new LoLPatcher.Archive(f.release, new ArrayList<ManifestFile>());
                     archivesToPurge.add(lastArchive);
                 }
                 lastArchive.files.add(f);
@@ -111,7 +113,7 @@ public class ArchivePurgeTask extends PatchTask {
         RAFArchive target = new RAFArchive(folderName + "/temp/Archive_1.raf");
 
         for(int i = 0; i < ar.files.size(); i++){
-            ReleaseManifest.File f = ar.files.get(i);
+            ManifestFile f = ar.files.get(i);
             archivePercentage = (float) i / ar.files.size();
             currentFile = f.name;
             

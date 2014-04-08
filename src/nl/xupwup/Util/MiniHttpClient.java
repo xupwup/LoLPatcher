@@ -105,7 +105,7 @@ public class MiniHttpClient implements AutoCloseable {
         
     }
     
-    private HttpResult get2(String url, long offset) throws IOException{
+    private HttpResult get2(String url, long offset, long endOffset) throws IOException{
         boolean error = false;
         if(lastResult != null){
             try{
@@ -125,14 +125,19 @@ public class MiniHttpClient implements AutoCloseable {
         ArrayList<String> headers = new ArrayList<>();
         do{
             try{
-                if(offset > 0){
+                if(offset != -1){
+                    String rangeStr = offset + "-";
+                    if(endOffset != -1){
+                        rangeStr += endOffset;
+                    }
                     sendRequest(os, "GET " + url + " HTTP/1.1", 
                         "Host: " + server,
                         "Accept: text/html", 
                         "Content-Length: 0",
                         "Connection: " + (closeConnection ? "close" : "keep-alive"),
                         "User-Agent: rickHttpClient",
-                        "Range: bytes=" + offset + "-"
+                        "Accept: */*",
+                        "Range: bytes=" + rangeStr
                     );
                 }else{
                     sendRequest(os, "GET " + url + " HTTP/1.1", 
@@ -140,7 +145,8 @@ public class MiniHttpClient implements AutoCloseable {
                         "Accept: text/html", 
                         "Content-Length: 0",
                         "Connection: " + (closeConnection ? "close" : "keep-alive"),
-                        "User-Agent: rickHttpClient"
+                        "User-Agent: rickHttpClient",
+                        "Accept: */*"
                     );
                 }
                 os.flush();
@@ -194,7 +200,7 @@ public class MiniHttpClient implements AutoCloseable {
             httpStream = new HTTPInputStream(left, in, length);
         }
         HttpResult res = new HttpResult(httpStream, headers, status, url);
-        if(!(offset == 0 && status == 200 || offset > 0 && status == 206 ) && throwExceptionWhenNot200){
+        if(!(offset == -1 && status == 200 || offset != -1 && status == 206 ) && throwExceptionWhenNot200){
             throw new IOException(headers.get(0) + ", for url: " + url);
         }
         return res;
@@ -205,11 +211,16 @@ public class MiniHttpClient implements AutoCloseable {
      * @param url  Relative urls only! For example "/test.html"
      * @return HTTPResult object
      * @throws IOException 
-     * @throws java.lang.InterruptedException 
      */
     public HttpResult get(String url) throws IOException{
-        HttpResult res = get2(url, 0);
-        lastResult = new HttpResult(new InputStreamWrapper(res), res.headers, res.code, res.url);
+        HttpResult res = get2(url, -1, -1);
+        lastResult = new HttpResult(new InputStreamWrapper(res, 0, -1), res.headers, res.code, res.url);
+        return lastResult;
+    }
+    
+    public HttpResult get(String url, long start, long end) throws IOException{
+        HttpResult res = get2(url, start, end);
+        lastResult = new HttpResult(new InputStreamWrapper(res, start, end), res.headers, res.code, res.url);
         return lastResult;
     }
     
@@ -435,6 +446,7 @@ public class MiniHttpClient implements AutoCloseable {
 
         InputStream in;
         long offset = 0;
+        long endoff = -1;
         boolean acceptRanges = false;
         HttpResult res;
         
@@ -442,8 +454,10 @@ public class MiniHttpClient implements AutoCloseable {
         /**
          * @param res 
          */
-        public InputStreamWrapper(HttpResult res) {
+        public InputStreamWrapper(HttpResult res, long off, long endoff) {
             this.in = res.in;
+            offset = off;
+            this.endoff = endoff;
             this.res = res;
             for(String header : res.headers){
                 if(header.toLowerCase().trim().startsWith("accept-ranges:") &&
@@ -484,7 +498,7 @@ public class MiniHttpClient implements AutoCloseable {
                     } catch (InterruptedException ex) {
                         throw new IOException("Interrupted exception while reading", e);
                     }
-                    HttpResult r2 = get2(res.url, offset);
+                    HttpResult r2 = get2(res.url, offset, -1);
                     in = r2.in;
                 }
             }

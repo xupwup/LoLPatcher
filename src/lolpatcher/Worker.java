@@ -9,6 +9,7 @@ import java.util.Arrays;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import static lolpatcher.PatchTask.speedStat;
+import lolpatcher.manifest.ManifestFile;
 import nl.xupwup.Util.MiniHttpClient;
 
 /**
@@ -29,7 +30,7 @@ public abstract class Worker extends Thread{
     };
     
     
-    protected boolean checkHash(InputStream in, LoLPatcher patcher, ReleaseManifest.File f, boolean updateProgress) {
+    protected boolean checkHash(InputStream in, LoLPatcher patcher, ManifestFile f, boolean updateProgress) {
         try {
             long total = 0;
             MessageDigest md = MessageDigest.getInstance("MD5");
@@ -45,6 +46,7 @@ public abstract class Worker extends Thread{
                     if(patcher.done) return true;
                 }
             } catch (IOException ex) {
+                ex.printStackTrace();
                 return false;
             }
             byte[] digest = md.digest();
@@ -54,7 +56,7 @@ public abstract class Worker extends Thread{
         }
         throw new Error("This should never happen. md5 not found");
     }
-    protected boolean checkHash(InputStream in, LoLPatcher patcher, ReleaseManifest.File f) throws IOException{
+    protected boolean checkHash(InputStream in, LoLPatcher patcher, ManifestFile f) throws IOException{
         return checkHash(in, patcher, f, true);
     }
 }

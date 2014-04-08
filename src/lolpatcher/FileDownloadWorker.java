@@ -13,6 +13,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.zip.InflaterInputStream;
 import static lolpatcher.PatchTask.speedStat;
+import lolpatcher.manifest.ManifestFile;
 import nl.xupwup.Util.MiniHttpClient;
 
 /**
@@ -34,7 +35,7 @@ public class FileDownloadWorker extends Worker{
                 htc.throwExceptionWhenNot200 = true;
                 htc.setErrorHandler(defaultHttpErrorHandler);
                 
-                ReleaseManifest.File task;
+                ManifestFile task;
                 while(true){
                     synchronized(patcher.filesToPatch){
                         if(patcher.filesToPatch.isEmpty() || patcher.done || patcher.error != null){
@@ -58,19 +59,13 @@ public class FileDownloadWorker extends Worker{
     }
     
     
-    private void downloadFile(ReleaseManifest.File f, MiniHttpClient hc) throws MalformedURLException, IOException, NoSuchAlgorithmException{
+    private void downloadFile(ManifestFile f, MiniHttpClient hc) throws MalformedURLException, IOException, NoSuchAlgorithmException{
         progress = 0;
         alternative = false;
-        java.io.File targetDir = patcher.getFileDir(f);
+        java.io.File targetDir = new java.io.File(patcher.getFileDir(f));
         java.io.File target = new java.io.File(targetDir.getPath() + "/" + f.name);
-        
-        String url = "/releases/"+patcher.branch+"/"+patcher.type+"/"
-                + patcher.project + "/releases/" + f.release + "/files/" + 
-                f.path.replaceAll(" ", "%20") + f.name.replaceAll(" ", "%20") + (f.fileType > 0 ? ".compressed" : "");
-        
-        
-        
         targetDir.mkdirs();
+        
         if(!target.createNewFile() && (patcher.force || patcher.forceSingleFiles)){
             alternative = true;
             if(checkHash(new BufferedInputStream(new FileInputStream(target)), patcher, f)){
@@ -79,14 +74,18 @@ public class FileDownloadWorker extends Worker{
         }
         progress = 0;
         
-        
+        String url = "/releases/"+patcher.branch+"/"+patcher.type+"/"
+            + patcher.project + "/releases/" + f.release + "/files/" + 
+            f.path.replaceAll(" ", "%20") + f.name.replaceAll(" ", "%20") + (f.fileType > 0 ? ".compressed" : "");
+
         MiniHttpClient.HttpResult hte = hc.get(url);
+        InputStream fileStream = hte.in;
         long total = 0;
         
         try(InputStream in = (
                 f.fileType > 0 ? 
-                    new InflaterInputStream(hte.in) :
-                    hte.in)){
+                    new InflaterInputStream(fileStream) :
+                    fileStream)){
             
             try(OutputStream fo = new BufferedOutputStream(new FileOutputStream(target))){
                 int read;
