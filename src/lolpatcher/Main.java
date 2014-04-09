@@ -35,14 +35,13 @@ import static org.lwjgl.opengl.GL11.*;
 public class Main extends GLFramework {
     public static int patcherVersion;
     static{
-        BufferedReader br = new BufferedReader(new InputStreamReader(GLFramework.class.getResourceAsStream("/version")));
-        try {
+        try(BufferedReader br = new BufferedReader(new InputStreamReader(GLFramework.class.getResourceAsStream("/version")))){
             patcherVersion = Integer.parseInt(br.readLine());
-            System.out.println("Patcher version is " + patcherVersion);
-        } catch (IOException ex) {
+        }catch (IOException ex) {
             patcherVersion = Integer.MAX_VALUE;
             Logger.getLogger(Main.class.getName()).log(Level.SEVERE, null, ex);
         }
+        System.out.println("Patcher version is " + patcherVersion);
     }
     public List<PatchTask> patchers;
     int currentPatcher = -1;
