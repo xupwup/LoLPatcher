@@ -35,6 +35,7 @@ public class SelfUpdateTask extends PatchTask{
                 }
             }
             int version = Integer.parseInt(response.get(0).trim());
+            System.out.println("Server has patcher version " + version);
             if(version <= patcherVersion){
                 percentage = 100;
                 done = true;
