@@ -69,7 +69,7 @@ public class ConfigurationTask extends PatchTask{
             final Window serverSelector = new Window(new Point(70, 15), "Select server");
             final String[] servers = new String[]{"EUW", "EUNE", "BR", "NA", "PBE"};
             final SelectList serverlist = new SelectList(
-                    servers
+                    servers, 1
                     , null, null, 0);
             serverSelector.addComponent(serverlist);
             serverSelector.addComponent(new Button("Save", new Listener() {
@@ -83,7 +83,7 @@ public class ConfigurationTask extends PatchTask{
             
             
             final SelectList languagelist = new SelectList(
-                    languages.toArray(new String[languages.size()])
+                    languages.toArray(new String[languages.size()]), 2
                     , null, null, 0);
             languageSelector.addComponent(languagelist);
             languageSelector.addComponent(new Button("Save", new Listener() {

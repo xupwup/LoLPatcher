@@ -20,22 +20,38 @@ public class SelectList extends Component{
     public int selected;
     Listener c;
     int h, w;
+    int columns;
     
-    public SelectList(String[] options, Listener c, Point location, int initial){
+    public SelectList(String[] options, int columns, Listener c, Point location, int initial){
         this.options = new ArrayList<>();
+        this.columns = columns;
         this.c = c;
         int padding = 3;
         int offset = 0;
+        h = 0;
         w = 0;
-        for(String s : options){
-            Option n = new Option(s, null, new Point(0,offset), false, true);
-            offset += n.getSize().y + padding;
-            if(w < n.getSize().x){
-                w = n.getSize().x;
+        int tempw = 0;
+        int wpad = 10;
+        
+        int colnr = 1;
+        
+        for(int i = 0; i < options.length; i++){
+            if(i == colnr * (Math.ceil((float) options.length / columns))){
+                w += tempw;
+                h = Math.max(h, offset);
+                offset = 0;
+                colnr++;
             }
+            String s = options[i];
+            Option n = new Option(s, null, new Point(w != 0 ? wpad + w : w,offset), false, true);
+            offset += n.getSize().y + padding;
+            tempw = Math.max(tempw, n.getSize().x);
             this.options.add(n);
         }
-        h = offset - padding;
+        w += tempw;
+        w += (colnr - 1) * wpad;
+        h = Math.max(h, offset);
+        h -= padding;
         select(selected = initial);
     }
 

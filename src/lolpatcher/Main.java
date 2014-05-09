@@ -80,7 +80,7 @@ public class Main extends GLFramework {
 
     @Override
     public void post_glInit() {
-        new SelectList(new String[]{"a"}, null, null, 0); // (ugly hack) make it initialise its textures on this thread
+        new SelectList(new String[]{"a"}, 1, null, null, 0); // (ugly hack) make it initialise its textures on this thread
         
         repairWindow = new Window(new Point(5,5), "Options");
         final Option sokopt = new Option("Quick repair", null, null, ignoreS_OK);
