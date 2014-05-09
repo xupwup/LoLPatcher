@@ -213,9 +213,6 @@ public class PackageDownloader {
     }
 
     public ArrayList<ManifestFile> downloadRanges(LoLPatcher p) throws FileNotFoundException, IOException {
-        File tempdir = new File("temp");
-        tempdir.mkdir();
-        
         lastSyncTime = System.currentTimeMillis();
         long bytesRead = 0;
         
@@ -266,6 +263,7 @@ public class PackageDownloader {
             pack.openFile(pack.next(), p, (int) (os - offset));
             pack.index++;
         }
+        int lastEnd = -1;
         for(int i = 0; i < pack.openfiles.size(); i++){
             Package.OpenFile of = pack.openfiles.get(i);
             if(i == 0){
@@ -274,6 +272,14 @@ public class PackageDownloader {
             int o = Math.max(0, (int) (of.pf.offset - offset));
             int remaining = Math.max(0, (int) ((of.pf.offset + of.pf.length) - offset));
             int l = Math.min(read, remaining) - o;
+            
+//            if(o < lastEnd){
+//            TODO todo omg omg omg -> skip deze file omg 
+//                
+//                pack.openfiles.remove(i--);
+//                continue;
+//            }
+            lastEnd = o + l;
             try{
                 of.os.write(buf, o, l);
             }catch(IOException e){

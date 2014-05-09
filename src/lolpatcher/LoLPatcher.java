@@ -85,6 +85,26 @@ public class LoLPatcher extends PatchTask{
         };
     }
     
+    public static String getNewestVersionInDir(java.io.File target){
+        String[] list = target.list(new FilenameFilter() {
+                                @Override
+                                public boolean accept(java.io.File dir, String name) {
+                                    return name.matches("((0|[1-9][0-9]{0,2})\\.){3}(0|[1-9][0-9]{0,2})");
+                                }
+                            });
+        String old = null;
+        int max = 0;
+            
+        for(String s : list){
+            int v = ReleaseManifest.getReleaseInt(s);
+            if(v > max || old == null){
+                max = v;
+                old = s;
+            }
+        }
+        return old;
+    }
+    
     @Override
     public void patch() throws MalformedURLException, IOException, NoSuchAlgorithmException{
         boolean S_OKExists = new java.io.File("RADS/"+type + "/" + project + "/releases/"
@@ -98,27 +118,14 @@ public class LoLPatcher extends PatchTask{
         java.io.File target = new java.io.File("RADS/" + type + "/" + project + "/releases/");
         
         if(target.exists()){
-            String[] list = target.list(new FilenameFilter() {
-                                @Override
-                                public boolean accept(java.io.File dir, String name) {
-                                    return name.matches("((0|[1-9][0-9]{0,2})\\.){3}(0|[1-9][0-9]{0,2})");
-                                }
-                            });
-            if(list.length > 0){
-                int max = 0;
-                String old = null;
-                for(String s : list){
-                    int v = ReleaseManifest.getReleaseInt(s);
-                    if(v > max || old == null){
-                        max = v;
-                        old = s;
-                    }
-                }
+            String old = getNewestVersionInDir(target);
+            if(old != null){
                 java.io.File oldDir = new java.io.File(target, old);
                 java.io.File newname = new java.io.File(target, targetVersion);
                 if(oldDir.renameTo(newname)){
-                    if(S_OKExists){ // only use old manifest if S_OK existed
-                        if(!ignoreS_OK){
+                    System.out.println(oldDir);
+                    if(new java.io.File(newname, "S_OK").exists()){ // only use old manifest if S_OK existed
+                        if(!ignoreS_OK || !old.equals(targetVersion)){
                             new java.io.File(newname, "S_OK").delete();
                         }
                         oldmf = new ReleaseManifest(new java.io.File(newname, "releasemanifest"));
@@ -149,6 +156,8 @@ public class LoLPatcher extends PatchTask{
         if(error != null){
             return;
         }
+        System.out.println(force);
+        System.out.println(forceSingleFiles);
         
         
         ArrayList<ManifestFile> cullFiles = cullFiles(mf, oldmf);
