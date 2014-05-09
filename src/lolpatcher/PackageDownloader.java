@@ -37,6 +37,7 @@ public class PackageDownloader {
         ArrayList<PackageFile> packages = new ArrayList<>();
         ArrayList<OpenFile> openfiles = new ArrayList<>();
         int index = 0;
+        
         Package(String name){
             this.name = name;
         }
@@ -252,6 +253,26 @@ public class PackageDownloader {
         return finished;
     }
     
+    /**
+     * Push the given bytes to all consumers. Such as archives or normal files. (Sends
+     * a slice of the given bytes to the appropriate outputstream(s))
+     * 
+     * This function assumes that the package file never contains two (or more) 
+     * overlapping files that belong to the same archive. If overlap does happen
+     * within the same archive, patching will silently create invalid data.
+     * Overlapping files that belong to another package, or files that are outside 
+     * of any package, are supported however.
+     * 
+     * I believe that packages never contain two overlapping files that belong to the
+     * same package. However, this may change in the future, or I may be wrong right now.
+     * 
+     * @param read  amount of bytes read
+     * @param offset  offset in the bin file
+     * @param buf  the byte buffer
+     * @param binName  the name of the bin file
+     * @param p  a reference to the patcher object.
+     * @throws IOException 
+     */
     private void pushBytes(int read, long offset, byte[] buf, String binName, LoLPatcher p) throws IOException{
         Package pack = packagefiles.get(binName);
         
@@ -263,7 +284,7 @@ public class PackageDownloader {
             pack.openFile(pack.next(), p, (int) (os - offset));
             pack.index++;
         }
-        int lastEnd = -1;
+        
         for(int i = 0; i < pack.openfiles.size(); i++){
             Package.OpenFile of = pack.openfiles.get(i);
             if(i == 0){
@@ -273,13 +294,6 @@ public class PackageDownloader {
             int remaining = Math.max(0, (int) ((of.pf.offset + of.pf.length) - offset));
             int l = Math.min(read, remaining) - o;
             
-//            if(o < lastEnd){
-//            TODO todo omg omg omg -> skip deze file omg 
-//                
-//                pack.openfiles.remove(i--);
-//                continue;
-//            }
-            lastEnd = o + l;
             try{
                 of.os.write(buf, o, l);
             }catch(IOException e){
