@@ -1,9 +1,10 @@
 package lolpatcher;
 
-import lolpatcher.manifest.ReleaseManifest;
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.FilenameFilter;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -14,7 +15,10 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.zip.DeflaterInputStream;
+import java.util.zip.InflaterInputStream;
 import lolpatcher.manifest.ManifestFile;
+import lolpatcher.manifest.ReleaseManifest;
 import nl.xupwup.Util.RingBuffer;
 
 /**
@@ -412,5 +416,27 @@ public class LoLPatcher extends PatchTask{
             Logger.getLogger(LoLPatcher.class.getName()).log(Level.SEVERE, null, ex);
         }
         return null;
+    }
+    
+    
+    public static void main(String[] args) throws IOException{
+        RAFArchive rafArchive = new RAFArchive(new File("RADS\\projects\\lol_game_client\\filearchives\\0.0.0.235\\Archive_1.raf"), 
+                                               new File("RADS\\projects\\lol_game_client\\filearchives\\0.0.0.235\\Archive_1.raf.dat"));
+        
+//        for(RAFArchive.RafFile fi : rafArchive.fileList){
+//            if(fi.name.contains("Talon.inibin")){
+//                System.out.println(fi);
+//            }
+//        }
+        RAFArchive.RafFile rfi = rafArchive.dictionary.get("DATA/Characters/Talon/Talon.inibin");
+        System.out.println(rfi.toString());
+        System.out.println("iscr" + rafArchive.isCompressed(rfi));
+        
+        InputStream in = new InflaterInputStream(rafArchive.readFile(rfi));
+        int r;
+        byte[] buf = new byte[1024];
+        while((r = in.read(buf)) != -1){
+            System.out.print(new String(buf, 0, r));
+        }
     }
 }

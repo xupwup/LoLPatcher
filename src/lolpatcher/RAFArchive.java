@@ -43,7 +43,7 @@ public class RAFArchive {
     /**
      * 
      */
-    private boolean isCompressed(RafFile f) throws IOException{
+    public boolean isCompressed(RafFile f) throws IOException{
         try {
             RandomAccessFile in = new RandomAccessFile(datRaf, "r");
             in.seek(f.startindex);
@@ -225,7 +225,7 @@ public class RAFArchive {
                     }else if (o1hash < o2hash){
                         return -1;
                     }else{
-                        return o1.name.compareTo(o2.name);
+                        return o1.name.toLowerCase().compareTo(o2.name.toLowerCase());
                     }
                 }
             });
