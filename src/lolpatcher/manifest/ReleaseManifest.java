@@ -59,13 +59,13 @@ public class ReleaseManifest {
     
     public class FileMetaData{
 
-        public FileMetaData(int nameindex, int release, byte[] checksum, int fileType, int size, int unknownInt2, int unknownInt3, int unknownInt4) {
+        public FileMetaData(int nameindex, int release, byte[] checksum, int fileType, int sizeUncompressed, int size, int unknownInt3, int unknownInt4) {
             this.nameindex = nameindex;
             this.release = release;
             this.checksum = checksum;
             this.fileType = fileType;
-            this.size = size;
-            this.unknownInt2 = unknownInt2;
+            this.sizeUncompressed = sizeUncompressed;
+            this.sizeCompressed = size;
             this.unknownInt3 = unknownInt3;
             this.unknownInt4 = unknownInt4;
         }
@@ -78,8 +78,8 @@ public class ReleaseManifest {
          * 5 = managed file
          */
         int fileType;
-        int size;
-        int unknownInt2;
+        int sizeCompressed; // size compressed. No idea what this means if a file is not supposed to be compressed
+        int sizeUncompressed; // the size of a file when its not compressed
         int unknownInt3;
         int unknownInt4;
     }
@@ -204,8 +204,8 @@ public class ReleaseManifest {
                 files[i] = new ManifestFile(getReleaseName(meta.release),
                         meta.release,
                         strs[meta.nameindex],
-                        meta.checksum, meta.size,
-                        meta.fileType, meta.unknownInt2,
+                        meta.checksum, meta.sizeCompressed,
+                        meta.fileType, meta.sizeUncompressed,
                         meta.unknownInt3, meta.unknownInt4);
             }
             // linking files to directories

@@ -5,6 +5,7 @@ import java.io.File;
 import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.net.MalformedURLException;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
@@ -118,10 +119,17 @@ public class ArchivePurgeTask extends PatchTask {
             currentFile = f.name;
             
             try (InputStream in = source.readFile(f.path + f.name)) {
-                target.writeFile(f.path + f.name, in, this);
-                if(done){
-                    System.out.println("exited archive purge task");
-                    return;
+                try(OutputStream os = target.writeFile(f.path + f.name, f)){
+                    byte[] buffer = new byte[1024];
+                    int r;
+                    while((r = in.read(buffer)) != -1){
+                        speedStat(r);
+                        if(done){
+                            System.out.println("exited archive purge task");
+                            return;
+                        }
+                        os.write(buffer, 0, r);
+                    }
                 }
             }
             int olen = source.dictionary.get(f.path + f.name).size;
@@ -135,7 +143,6 @@ public class ArchivePurgeTask extends PatchTask {
         if(target.fileList.isEmpty()){
             LoLPatcher.deleteDir(folder);
         }else{
-            
             if(!sourceRaf.delete()){
                 throw new IOException("Delete failed for " + folderName + archives[0]);
             }

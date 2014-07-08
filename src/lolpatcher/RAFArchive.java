@@ -9,13 +9,14 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.RandomAccessFile;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import static lolpatcher.StreamUtils.*;
-import nl.xupwup.Util.CountingOutputStream;
+import lolpatcher.manifest.ManifestFile;
 import nl.xupwup.Util.FileSliceInputStream;
 
 /**
@@ -25,7 +26,7 @@ import nl.xupwup.Util.FileSliceInputStream;
 public class RAFArchive {
     File raf;
     File datRaf;
-    CountingOutputStream out;
+    final RandomAccessFile out;
     boolean changed = false;
     ArrayList<RafFile> fileList;
     HashMap<String, RafFile> dictionary;
@@ -36,18 +37,20 @@ public class RAFArchive {
         datRaf = new File(path + ".dat");
         datRaf.createNewFile();
         fileList = new ArrayList<>();
-        out = new CountingOutputStream(new BufferedOutputStream(new FileOutputStream(datRaf)));
+        out = new RandomAccessFile(datRaf, "rw");
         dictionary = new HashMap<>();
     }
     
     /**
      * 
+     * @param f
+     * @return whether or not the given file is compressed.
+     * @throws java.io.IOException
      */
     public boolean isCompressed(RafFile f) throws IOException{
-        try {
-            RandomAccessFile in = new RandomAccessFile(datRaf, "r");
+        try (RandomAccessFile in = new RandomAccessFile(datRaf, "r")) {
             in.seek(f.startindex);
-            return (in.readByte() == 0x78 && in.readByte() == 0xffffff9c);
+            return in.readByte() == 0x78 && in.readByte() == 0xffffff9c;
         } catch (FileNotFoundException ex) {
             Logger.getLogger(RAFArchive.class.getName()).log(Level.SEVERE, null, ex);
         }
@@ -102,13 +105,12 @@ public class RAFArchive {
             dictionary.put(f.name, f);
             maxindex = Math.max(maxindex, f.startindex + f.size);
         }
-        out = new CountingOutputStream(new BufferedOutputStream(new FileOutputStream(datRaf, true)));
-        out.setIndex(datRaf.length());
+        out = new RandomAccessFile(datRaf, "rw");
     }
     
     public class RafFile{
         long startindex; // fits in unsigned int, but not in normal int
-        int size = 0;
+        int size = -1;
         String name;
         int pathhash;
         int pathlistindex;
@@ -123,39 +125,6 @@ public class RAFArchive {
         public String toString() {
             return name + " (size: " + size + " startindex: "+startindex + " pathlistindex: "+pathlistindex+")";
         }
-    }
-    
-    
-    /**
-     * Writes the .raf.dat file
-     * @param path
-     * @param name
-     * @param in
-     * @param patcher
-     * @throws IOException 
-     */
-    public void writeFile(String path, InputStream in, PatchTask patcher) throws IOException{
-        changed = true;
-        RafFile rf = new RafFile(out.getIndex(), path);
-        fileList.add(rf);
-        rf.pathlistindex = fileList.size()-1;
-        
-        byte[] buffer = new byte[4096];
-        int read;
-        while((read = in.read(buffer)) != -1){
-            out.write(buffer, 0, read);
-            LoLPatcher.speedStat(read);
-            rf.size += read;
-            if(patcher.done) return;
-        }
-        dictionary.put(rf.name, rf);
-    }
-    public OutputStream getRAFFileOutputStream(String path, int offset){
-        RafFileOutputStream os = new RafFileOutputStream(out, path, offset);
-        synchronized(rafFileOutputStreams){
-            rafFileOutputStreams.add(os);
-        }
-        return os;
     }
     
     /**
@@ -194,15 +163,14 @@ public class RAFArchive {
      * Writes the .raf file itself
      */
     public void close() throws IOException{
-        sync();
         out.close();
+        sync();
     }
     
     public void sync() throws IOException{
         if(!changed){
             return;
         }
-        out.flush();
         raf.createNewFile();
         try (OutputStream rafOut = new BufferedOutputStream(new FileOutputStream(raf))){
             rafOut.write(getIntBytes(0x18be0ef0)); // magic number
@@ -211,11 +179,18 @@ public class RAFArchive {
             rafOut.write(getIntBytes(0)); // raf manager index (why zero??)
 
             rafOut.write(getIntBytes(20)); // File list offset
-            rafOut.write(getIntBytes(20 + 4 + fileList.size() * 16)); // Path list offset
+            
+            ArrayList<RafFile> finishedFiles = new ArrayList<>(fileList.size());
+            for(RafFile fi : fileList){
+                if(fi.size != -1){
+                    finishedFiles.add(fi);
+                }
+            }
+            rafOut.write(getIntBytes(20 + 4 + finishedFiles.size() * 16)); // Path list offset
 
-            rafOut.write(getIntBytes(fileList.size())); // count of file entries
+            rafOut.write(getIntBytes(finishedFiles.size())); // count of file entries
 
-            Collections.sort(fileList, new Comparator<RafFile>(){
+            Collections.sort(finishedFiles, new Comparator<RafFile>(){
                 @Override
                 public int compare(RafFile o1, RafFile o2) {
                     long o1hash = o1.pathhash & 0xffffffff;
@@ -225,12 +200,12 @@ public class RAFArchive {
                     }else if (o1hash < o2hash){
                         return -1;
                     }else{
-                        return o1.name.toLowerCase().compareTo(o2.name.toLowerCase());
+                        return o1.name.compareToIgnoreCase(o2.name);
                     }
                 }
             });
             int pathlistindex = 0;
-            for(RafFile f : fileList){
+            for(RafFile f : finishedFiles){
                 rafOut.write(getIntBytes(f.pathhash)); // path hash
                 rafOut.write(getIntBytes(f.startindex)); // start index
                 rafOut.write(getIntBytes(f.size)); // size
@@ -238,22 +213,22 @@ public class RAFArchive {
             }
 
             int stringSum = 0;
-            for(RafFile f : fileList){
+            for(RafFile f : finishedFiles){
                 stringSum += f.name.getBytes().length + 1; // include nul byte
             }
             rafOut.write(getIntBytes(stringSum)); // path list size
-            rafOut.write(getIntBytes(fileList.size())); // path list count
+            rafOut.write(getIntBytes(finishedFiles.size())); // path list count
 
-            int pathOffset = 8 + fileList.size() * 8;
-            for(RafFile f : fileList){
+            int pathOffset = 8 + finishedFiles.size() * 8;
+            for(RafFile f : finishedFiles){
                 rafOut.write(getIntBytes(pathOffset)); // path offset
                 int l = f.name.getBytes().length + 1;
                 pathOffset += l;
                 rafOut.write(getIntBytes(l)); // path length
             }
-            for(RafFile f : fileList){
-                rafOut.write(f.name.getBytes()); // path list count
-                rafOut.write(0x00); // path list count
+            for(RafFile f : finishedFiles){
+                rafOut.write(f.name.getBytes());
+                rafOut.write(0x00);
             }
             changed = false;
         } catch (FileNotFoundException ex) {
@@ -309,67 +284,67 @@ public class RAFArchive {
         return readFile(selectedFile);
     }
     
+    /**
+     * Writes to the .raf.dat file
+     * @param path
+     * @param mf
+     * @return an outputstream for the file with the given path. (buffered)
+     * @throws IOException 
+     */
+    public OutputStream writeFile(String path, ManifestFile mf) throws IOException{
+        RafFile rf = new RafFile(out.length(), path);
+        rf.pathlistindex = 0; // this is not used in sync, so it does not need to be correct here
+        dictionary.put(rf.name, rf);
+        fileList.add(rf);
+        synchronized(out){
+            out.setLength(out.length() + (mf.fileType == 6 ? mf.sizeUncompressed : mf.sizeCompressed));
+        }
+        return new BufferedOutputStream(new RafFileOutputStream(mf, rf, out));
+    }
+    
+    /**
+     * Note that this class sets the size of the corresponding RafFile when it is
+     * completely written. Therefore, you can check whether a file was entirely written
+     * by looking at its size field.
+     */
     private class RafFileOutputStream extends OutputStream{
-        long startIndex = -1;
-        long currentIndex;
-        String path;
-        CountingOutputStream out;
+        private final ManifestFile mf;
+        private final RafFile rf;
+        private final RandomAccessFile file;
+        int count = 0;
         
-        /**
-         * @param out
-         * @param path
-         * @param offset 
-         */
-        public RafFileOutputStream(CountingOutputStream out, String path, int offset) {
-            this.path = path;
-            this.out = out;
-        }
-
-        private int preWrite(int c){
-            if(startIndex == -1){
-                startIndex = out.getIndex();
-                currentIndex = out.getIndex();
-            }
-            long realIndex = out.getIndex();
-            currentIndex += c;
-            return (int) (currentIndex - realIndex);
+        public RafFileOutputStream(ManifestFile mf, RafFile rf, RandomAccessFile file){
+            this.file = file;
+            this.rf = rf;
+            this.mf = mf;
         }
         
         @Override
-        public void write(byte[] b) throws IOException {
-            int toWrite = preWrite(b.length);
-            if(toWrite > 0){
-                out.write(b, b.length - toWrite, toWrite);
-            }
+        public void write(int i) throws IOException {
+            write(new byte[]{(byte) i});
         }
 
         @Override
-        public void write(int b) throws IOException {
-            int toWrite = preWrite(1);
-            if(toWrite > 0){
-                out.write(b);
-            }
+        public void write(byte[] bytes) throws IOException {
+            write(bytes, 0, bytes.length);
         }
 
         @Override
-        public void write(byte[] b, int off, int len) throws IOException {
-            int toWrite = preWrite(len);
-            if(toWrite > 0){
-                out.write(b, off + (len - toWrite), toWrite);
+        public void write(byte[] bytes, int off, int len) throws IOException {
+            synchronized(file){
+                file.seek(rf.startindex + count);
+                file.write(bytes, off, len);
+                count += len;
+            }
+            if(count > (mf.fileType == 6 ? mf.sizeUncompressed : mf.sizeCompressed)){
+                throw new IOException("Too many bytes written. File length should have been "
+                        + mf.sizeCompressed + " but " + count + " bytes written. Last chunk is l="+len + " == "+ new String(Arrays.copyOfRange(bytes, off, len)) + "\n" + mf);
             }
         }
-        
 
         @Override
         public void close() throws IOException {
-            RafFile rf = new RafFile(startIndex, path);
-            rf.size = (int) (currentIndex - startIndex);
-            fileList.add(rf);
-            rf.pathlistindex = fileList.size()-1;
-            dictionary.put(rf.name, rf);
-            synchronized(rafFileOutputStreams){
-                rafFileOutputStreams.remove(this);
-            }
+            rf.size = count;
             changed = true;
         }
     }

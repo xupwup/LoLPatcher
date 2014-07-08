@@ -3,9 +3,11 @@ package lolpatcher;
 import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.zip.InflaterInputStream;
+import static lolpatcher.PatchTask.speedStat;
 import lolpatcher.manifest.ManifestFile;
 import nl.xupwup.Util.MiniHttpClient;
 
@@ -89,8 +91,19 @@ public class ArchiveDownloadWorker extends Worker{
         
 
         try(InputStream in = (f.fileType == 6 ? new InflaterInputStream(fileStream) : fileStream)){
-            archive.writeFile(f.path + f.name, in, patcher);
+            try(OutputStream os = archive.writeFile(f.path + f.name, f)){
+                byte[] buffer = new byte[1024];
+                int r;
+                while((r = in.read(buffer)) != -1){
+                    speedStat(r);
+                    if(patcher.done){
+                        System.out.println("exited archive purge task");
+                        return;
+                    }
+                    os.write(buffer, 0, r);
+                }
+            }
         }
     }
-    
+
 }

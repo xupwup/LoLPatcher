@@ -10,11 +10,12 @@ public class ManifestFile{
     public final String name;
     public String path;
     public final byte[] checksum;
-    public final int size;
+    public final int sizeCompressed;
+    public final int sizeUncompressed; // use this value instead of size when type is 6
 
     @Override
     public String toString() {
-        return path + name + " " +release + " type:" + fileType + " u2:" + unknown2 + " u3:"+unknown3 + " u4:" + unknown4;
+        return path + name + " " +release + " type:" + fileType + " u2:" + sizeUncompressed + " u3:"+unknown3 + " u4:" + unknown4;
     }
 
 
@@ -29,22 +30,22 @@ public class ManifestFile{
      * 4 = copy to sln?
      */
     public final int fileType;
-    public final int unknown2;
+    
     public final int unknown3;
     public final int unknown4;
 
-    public ManifestFile(String release, int releaseInt, String name, byte[] checksum, int size,
-            int fileType, int unknown2, int unknown3, int unknown4) {
+    public ManifestFile(String release, int releaseInt, String name, byte[] checksum, int sizeCompressed,
+            int fileType, int sizeUncompressed, int unknown3, int unknown4) {
         this.release = release;
         this.releaseInt = releaseInt;
         this.name = name;
         this.checksum = checksum;
-        this.size = size;
+        this.sizeCompressed = sizeCompressed;
         this.fileType = fileType;
         if(fileType != 0 && fileType != 2 && fileType != 5 && fileType != 6 && fileType != 22 && fileType != 4){
             System.out.println("Hmm... fileType = " + fileType + " (" + name + ")");
         }
-        this.unknown2 = unknown2;
+        this.sizeUncompressed = sizeUncompressed;
         this.unknown3 = unknown3;
         this.unknown4 = unknown4;
     }

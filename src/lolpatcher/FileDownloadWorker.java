@@ -94,7 +94,7 @@ public class FileDownloadWorker extends Worker{
                     fo.write(buffer, 0, read);
                     speedStat(read);
                     total += read;
-                    progress = (float) total / f.size;
+                    progress = (float) total / f.sizeCompressed;
                     if(patcher.done) return;
                 }
             }

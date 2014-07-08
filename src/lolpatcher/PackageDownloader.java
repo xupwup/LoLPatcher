@@ -32,6 +32,7 @@ public class PackageDownloader {
     long totalBytes = 0;
     long lastSyncTime;
     
+    
     private class Package{
         String name;
         ArrayList<PackageFile> packages = new ArrayList<>();
@@ -44,8 +45,8 @@ public class PackageDownloader {
         PackageFile next(){
             return packages.get(index);
         }
-        OpenFile openFile(PackageFile pf, LoLPatcher p, int offset) throws IOException{
-            OpenFile of = new OpenFile(pf, p, offset);
+        OpenFile openFile(PackageFile pf, LoLPatcher p) throws IOException{
+            OpenFile of = new OpenFile(pf, p);
             openfiles.add(of);
             return of;
         }
@@ -53,11 +54,11 @@ public class PackageDownloader {
             OutputStream os;
             final PackageFile pf;
 
-            OpenFile(PackageFile pf, LoLPatcher p, int offset) throws IOException {
+            OpenFile(PackageFile pf, LoLPatcher p) throws IOException {
                 this.pf = pf;
                 int fileType = pf.mf.fileType;
                 if(fileType == 6 || fileType == 22){
-                    os = p.getArchive(pf.mf.release).getRAFFileOutputStream(pf.mf.path + pf.mf.name, offset);
+                    os = p.getArchive(pf.mf.release).writeFile(pf.mf.path + pf.mf.name, pf.mf);
                 }else{
                     File targetDir = new File(p.getFileDir(pf.mf));
                     File target = new File(targetDir, pf.mf.name);
@@ -70,7 +71,6 @@ public class PackageDownloader {
             }
         }
     }
-
     
     private class PackageFile{
         final String name;
@@ -281,7 +281,7 @@ public class PackageDownloader {
             if(pack.next().offset > offset + read){
                 System.err.println("WTF omg omg omg");
             }
-            pack.openFile(pack.next(), p, (int) (os - offset));
+            pack.openFile(pack.next(), p);
             pack.index++;
         }
         

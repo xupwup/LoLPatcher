@@ -168,18 +168,20 @@ public class LoLPatcher extends PatchTask{
         if(files.isEmpty()){
             files = cullFiles;
             System.out.println("cullfiles.length"+cullFiles.size());
-        }
-        if(cullFiles.size() > 0){
-            try{
-                currentFile = "Downloading Packages";
-                PackageDownloader ps = new PackageDownloader(targetVersion, project, branch);
-                ps.updateRanges(cullFiles);
-                files.removeAll(ps.downloadRanges(this));
-                downloadPercentage = 0;
-            }catch(IOException e){
-                e.printStackTrace();
+            
+            if(cullFiles.size() > 0){
+                try{
+                    currentFile = "Downloading Packages";
+                    PackageDownloader ps = new PackageDownloader(targetVersion, project, branch);
+                    ps.updateRanges(cullFiles);
+                    files.removeAll(ps.downloadRanges(this));
+                    downloadPercentage = 0;
+                }catch(IOException e){
+                    e.printStackTrace();
+                }
             }
         }
+        
         Collections.sort(files, new Comparator<ManifestFile>() {
             @Override
             public int compare(ManifestFile o1, ManifestFile o2) {

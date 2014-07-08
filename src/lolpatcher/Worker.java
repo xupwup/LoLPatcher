@@ -40,7 +40,7 @@ public abstract class Worker extends Thread{
                 while((read = is.read(buffer)) != -1){
                     total += read;
                     if(updateProgress){
-                        progress = (float) total / f.size;
+                        progress = (float) total / f.sizeCompressed;
                     }
                     speedStat(read);
                     if(patcher.done) return true;
