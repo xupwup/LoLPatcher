@@ -148,6 +148,9 @@ public class LoLPatcher extends PatchTask{
         ArrayList<ManifestFile> files = new ArrayList<>();
         if(force || forceSingleFiles){
             for(ManifestFile f : mf.files){
+                if(!filter.accept(null, f.name)){
+                    continue;
+                }
                 if(f.fileType == 6 || f.fileType == 22){
                     if(force){
                         files.add(f);
