@@ -410,7 +410,12 @@ public class Main extends GLFramework {
                 try {
                     Runtime.getRuntime().exec(new String[]{System.getProperty("java.home")+"/bin/java", "-jar", "Maestro.jar", new java.io.File("RADS/solutions/lol_game_client_sln/releases/").getAbsolutePath()});
 
-                    Runtime.getRuntime().exec(new String[]{new java.io.File("RADS/projects/lol_air_client/releases/"+airversion+"/deploy/LolClient.exe").getAbsolutePath()});
+                    String exeLoc = new java.io.File("RADS/projects/lol_air_client/releases/"+airversion+"/deploy/LolClient.exe").getAbsolutePath();
+                    if(System.getProperty("os.name").equals("Linux")){
+                        Runtime.getRuntime().exec(new String[]{"wine", exeLoc});
+                    }else{
+                        Runtime.getRuntime().exec(new String[]{exeLoc});
+                    }
                     System.exit(0);
                 } catch (IOException ex) {
                     Logger.getLogger(Main.class.getName()).log(Level.SEVERE, null, ex);
