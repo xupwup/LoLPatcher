@@ -67,9 +67,10 @@ public class ConfigurationTask extends PatchTask{
             final Window languageSelector = new Window(new Point(50, 10), "Select language");
             
             final Window serverSelector = new Window(new Point(70, 15), "Select server");
-            final String[] servers = new String[]{"EUW", "EUNE", "BR", "NA", "PBE"};
+            final String[] serversHuman = new String[]{"EUW", "EUNE", "BR", "NA", "PBE", "LAN", "LAS"};
+            final String[] serversActual = new String[]{"EUW", "EUNE", "BR", "NA", "PBE", "LA1", "LA2"};
             final SelectList serverlist = new SelectList(
-                    servers, 1
+                    serversHuman, 1
                     , null, null, 0);
             serverSelector.addComponent(serverlist);
             serverSelector.addComponent(new Button("Save", new Listener() {
@@ -77,7 +78,7 @@ public class ConfigurationTask extends PatchTask{
                 public void click(Component c) {
                     main.wm.closeWindow(serverSelector);
                     main.wm.addWindow(languageSelector);
-                    server = servers[serverlist.selected];
+                    server = serversActual[serverlist.selected];
                 }
             }, null));
             
@@ -146,6 +147,17 @@ public class ConfigurationTask extends PatchTask{
                     "2\n" +
                     "lol_game_client\n" +
                     "lol_game_client_" + language);
+        }
+        
+        File confdir = new java.io.File("RADS/solutions/lol_game_client_sln/releases/" + slnversion + "/deploy/DATA/cfg/");
+        confdir.mkdirs();
+        File conf = new File(confdir, "locale.cfg");
+        
+        try (BufferedWriter bw = new BufferedWriter(new FileWriter(conf))) {
+            String[] lang = language.split("_");
+            lang[1] = lang[1].toUpperCase();
+            bw.write("[General]\n" +
+                     "LanguageLocaleRegion="+lang[0] + "_"+lang[1]);
         }
     }
     
