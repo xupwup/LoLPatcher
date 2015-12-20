@@ -4,12 +4,16 @@ import java.awt.Font;
 import java.awt.Point;
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileReader;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import nl.xupwup.Util.Color;
@@ -57,8 +61,8 @@ public class Main extends GLFramework {
     boolean changeRegionSettings = false;
     private ShaderProgram progressBarShader;
     private Texture informationBackgroundTexture;
-    
     float playw, playh, playx, playy, repairw;
+    boolean autostart;
     
     public Main(){
         super("XUPWUP's League Of Legends Patcher", false);
@@ -72,7 +76,6 @@ public class Main extends GLFramework {
             patchers.add(new SelfUpdateTask());
         }
         
-        
         patchers.add(new ConfigurationTask(this));
         patcher = null;
         currentPatcher = -1;
@@ -81,7 +84,7 @@ public class Main extends GLFramework {
     @Override
     public void post_glInit() {
         new SelectList(new String[]{"a"}, 1, null, null, 0); // (ugly hack) make it initialise its textures on this thread
-        
+        autostart = getAutoStart();
         repairWindow = new Window(new Point(5,5), "Options");
         final Option sokopt = new Option("Quick repair", null, null, ignoreS_OK);
         repairWindow.addComponent(sokopt);
@@ -116,6 +119,26 @@ public class Main extends GLFramework {
             @Override
             public void click(Component c) {
                 purgeAfterwards = ((CheckBox) c).checked;
+            }
+        }, null));
+        repairWindow.addComponent(new Option("Autostart", new Listener() {
+            @Override
+            public void click(Component c) {
+                boolean autostart = ((CheckBox) c).checked;
+                Properties props = new Properties();
+                if(new File("settings.txt").exists()){
+                    try {
+                        props.load(new FileReader("settings.txt"));
+                    } catch (IOException ex) {
+                        Logger.getLogger(Main.class.getName()).log(Level.SEVERE, null, ex);
+                    }
+                }
+                props.setProperty("autostart", Boolean.toString(autostart));
+                try {
+                    props.store(new FileWriter("settings.txt"), null);
+                } catch (IOException ex) {
+                    Logger.getLogger(Main.class.getName()).log(Level.SEVERE, null, ex);
+                }
             }
         }, null));
         repairWindow.addComponent(new Button("Go", new Listener() {
@@ -308,44 +331,47 @@ public class Main extends GLFramework {
             }
         }
         
-        
         if(patcher != null && patcher.error == null && patcher.done && currentPatcher == patchers.size() - 1){
-            int x = Mouse.getX();
-            int y = Mouse.getY();
-            y = (int) (windowSize.y - y);
-            if(x > playx && x < playx + playw &&
-                    y > playy && y < playy + playh){
+            if(autostart){
+                startGame();
+            } else {
+                int x = Mouse.getX();
+                int y = Mouse.getY();
+                y = (int) (windowSize.y - y);
+                if(x > playx && x < playx + playw &&
+                        y > playy && y < playy + playh){
 
-                glColor3f(1, 0.5f, 0);
-            }else{
-                glColor3f(1, 0.8f, 0);
-            }
-            
-            glBegin(GL_QUADS);
-                glVertex2f(playx - 3, playy - 4);
-                glVertex2f(playx - 3, playy + playh);
-                glVertex2f(playx + playw + 3, playy + playh);
-                glVertex2f(playx + playw + 3, playy - 4);
-            glEnd();
-            glColor3f(0, 0, 0);
-            news.bold.draw("PLAY", playx, playy);
-            
-            if(x > playx + 100 && x < playx + repairw + 100 &&
-                    y > playy && y < playy + playh){
+                    glColor3f(1, 0.5f, 0);
+                }else{
+                    glColor3f(1, 0.8f, 0);
+                }
 
-                glColor3f(1, 0.5f, 0);
-            }else{
-                glColor3f(1, 0.8f, 0);
+                glBegin(GL_QUADS);
+                    glVertex2f(playx - 3, playy - 4);
+                    glVertex2f(playx - 3, playy + playh);
+                    glVertex2f(playx + playw + 3, playy + playh);
+                    glVertex2f(playx + playw + 3, playy - 4);
+                glEnd();
+                glColor3f(0, 0, 0);
+                news.bold.draw("PLAY", playx, playy);
+
+                if(x > playx + 100 && x < playx + repairw + 100 &&
+                        y > playy && y < playy + playh){
+
+                    glColor3f(1, 0.5f, 0);
+                }else{
+                    glColor3f(1, 0.8f, 0);
+                }
+
+                glBegin(GL_QUADS);
+                    glVertex2f(100 + playx - 3, playy - 4);
+                    glVertex2f(100 + playx - 3, playy + playh);
+                    glVertex2f(100 + playx + repairw + 3, playy + playh);
+                    glVertex2f(100 + playx + repairw + 3, playy - 4);
+                glEnd();
+                glColor3f(0, 0, 0);
+                news.bold.draw("Settings", 100 + playx, playy);
             }
-            
-            glBegin(GL_QUADS);
-                glVertex2f(100 + playx - 3, playy - 4);
-                glVertex2f(100 + playx - 3, playy + playh);
-                glVertex2f(100 + playx + repairw + 3, playy + playh);
-                glVertex2f(100 + playx + repairw + 3, playy - 4);
-            glEnd();
-            glColor3f(0, 0, 0);
-            news.bold.draw("Settings", 100 + playx, playy);
         }
         
         repaint();
@@ -399,31 +425,45 @@ public class Main extends GLFramework {
     public void resize(int w, int h) {
         
     }
+    
+    private boolean getAutoStart(){
+        if(new File("settings.txt").exists()){
+            try {
+                Properties props = new Properties();
+                props.load(new FileReader("settings.txt"));
+                return Boolean.parseBoolean(props.getProperty("autostart"));
+            } catch (FileNotFoundException ex) {
+                Logger.getLogger(Main.class.getName()).log(Level.SEVERE, null, ex);
+            } catch (IOException ex) {
+                Logger.getLogger(Main.class.getName()).log(Level.SEVERE, null, ex);
+            }
+        }
+        return false;
+    }
+    
+    private void startGame(){
+        try {
+            Runtime.getRuntime().exec(new String[]{System.getProperty("java.home")+"/bin/java", "-jar", "Maestro.jar", new java.io.File("RADS/solutions/lol_game_client_sln/releases/").getAbsolutePath()});
+
+            String exeLoc = new java.io.File("RADS/projects/lol_air_client/releases/"+airversion+"/deploy/LolClient.exe").getAbsolutePath();
+            if(System.getProperty("os.name").equals("Linux")){
+                Runtime.getRuntime().exec(new String[]{"wine", exeLoc});
+            }else{
+                Runtime.getRuntime().exec(new String[]{exeLoc});
+            }
+            System.exit(0);
+        } catch (IOException ex) {
+            Logger.getLogger(Main.class.getName()).log(Level.SEVERE, null, ex);
+        }
+    }
 
     @Override
     public void onClick(int x, int y) {
         y = (int) (windowSize.y - y);
         if(patcher != null && patcher.error == null && patcher.done && currentPatcher == patchers.size() - 1){
-            
-            if(x > playx && x < playx + playw &&
-                    y > playy && y < playy + playh){
-                try {
-                    Runtime.getRuntime().exec(new String[]{System.getProperty("java.home")+"/bin/java", "-jar", "Maestro.jar", new java.io.File("RADS/solutions/lol_game_client_sln/releases/").getAbsolutePath()});
-
-                    String exeLoc = new java.io.File("RADS/projects/lol_air_client/releases/"+airversion+"/deploy/LolClient.exe").getAbsolutePath();
-                    if(System.getProperty("os.name").equals("Linux")){
-                        Runtime.getRuntime().exec(new String[]{"wine", exeLoc});
-                    }else{
-                        Runtime.getRuntime().exec(new String[]{exeLoc});
-                    }
-                    System.exit(0);
-                } catch (IOException ex) {
-                    Logger.getLogger(Main.class.getName()).log(Level.SEVERE, null, ex);
-                }
-
-            }else if(x > playx + 100 && x < 100 + playx + repairw &&
-                    y > playy && y < playy + playh){
-
+            if(x > playx && x < playx + playw && y > playy && y < playy + playh){
+                startGame();
+            }else if(x > playx + 100 && x < 100 + playx + repairw && y > playy && y < playy + playh){
                 wm.addWindow(repairWindow);
             }
         }
