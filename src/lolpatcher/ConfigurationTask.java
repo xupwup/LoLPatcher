@@ -179,7 +179,6 @@ public class ConfigurationTask extends PatchTask{
         String gameversion = LoLPatcher.getVersion("projects", "lol_game_client", server);
         String airconfigversion = LoLPatcher.getVersion("projects", clientConfigName, server);
         String gamelanguageversion = LoLPatcher.getVersion("projects", "lol_game_client_"+language, server);
-        String patcherVersion = LoLPatcher.getVersion("projects", "lol_patcher", server);
 
         if(main.purgeAfterwards){
             main.patchers.add(new ArchivePurgeTask("lol_game_client", gameversion, branch, "projects"));
@@ -191,21 +190,12 @@ public class ConfigurationTask extends PatchTask{
         main.patchers.add(new LoLPatcher(airconfigversion, clientConfigName, branch, main.ignoreS_OK, main.force));
         main.patchers.add(new LoLPatcher(gamelanguageversion, "lol_game_client_"+language, branch, main.ignoreS_OK, main.force));
         
-        main.patchers.add(new LoLPatcher(patcherVersion, "lol_patcher", branch, main.ignoreS_OK, main.force, new FilenameFilter() {
-            @Override
-            public boolean accept(File dir, String name) {
-                return name.equals("RiotRadsIO.dll");
-            }
-        }));
         main.patchers.add(new CopyTask(
                 new File("RADS/projects/"+clientConfigName+"/releases/"+airconfigversion+"/deploy/"),
                 new File("RADS/projects/lol_air_client/releases/"+main.airversion+"/deploy/"), true));
         
         
         main.patchers.add(new SLNPatcher(gameversion, slnversion, main.ignoreS_OK));
-        main.patchers.add(new CopyTask(
-                new File("RADS/projects/lol_patcher/releases/"+patcherVersion+"/deploy/RiotRadsIO.dll"), 
-                new File("RADS/"), true));
         
         main.patchers.add(new RunTask(new Runnable() {
             @Override
