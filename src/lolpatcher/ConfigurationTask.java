@@ -141,22 +141,22 @@ public class ConfigurationTask extends PatchTask{
         File f = new java.io.File("RADS/solutions/lol_game_client_sln/releases/" + slnversion + "/configurationmanifest");
         f.createNewFile();
         try (BufferedWriter bw = new BufferedWriter(new FileWriter(f))) {
-            bw.write("RADS Configuration Manifest\n" +
-                    "1.0.0.0\n" +
-                    language + "\n" +
-                    "2\n" +
-                    "lol_game_client\n" +
-                    "lol_game_client_" + language);
+            bw.write("RADS Configuration Manifest\r\n" +
+                    "1.0.0.0\r\n" +
+                    language + "\r\n" +
+                    "2\r\n" +
+                    "lol_game_client\r\n" +
+                    "lol_game_client_" + language + "\r\n");
         }
         
-        File confdir = new java.io.File("RADS/solutions/lol_game_client_sln/releases/" + slnversion + "/deploy/DATA/cfg/");
+        File confdir = new java.io.File("RADS/solutions/lol_game_client_sln/releases/" + slnversion + "/deploy/DATA/cfg/defaults/");
         confdir.mkdirs();
         File conf = new File(confdir, "locale.cfg");
         
         try (BufferedWriter bw = new BufferedWriter(new FileWriter(conf))) {
             String[] lang = language.split("_");
             lang[1] = lang[1].toUpperCase();
-            bw.write("[General]\n" +
+            bw.write("[General]\r\n" +
                      "LanguageLocaleRegion="+lang[0] + "_"+lang[1]);
         }
     }
@@ -206,8 +206,7 @@ public class ConfigurationTask extends PatchTask{
                     try (BufferedWriter bw = new BufferedWriter(new FileWriter(f))) {
                         String[] lang = language.split("_");
                         lang[1] = lang[1].toUpperCase();
-                        bw.write("locale=" + lang[0] + "_" + lang[1] +
-                                "\n");
+                        bw.write("locale=" + lang[0] + "_" + lang[1]);
                     }
                 }   catch (IOException ex) {
                     Logger.getLogger(ConfigurationTask.class.getName()).log(Level.SEVERE, null, ex);
