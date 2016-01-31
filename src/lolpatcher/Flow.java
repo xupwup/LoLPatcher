@@ -31,7 +31,7 @@ public class Flow {
     private final ShaderProgram sp, sp2, logodump;
     private final FrameBuffer screenBuffer;
     private Texture title;
-    private boolean meep = true;
+    private boolean firstFrame = true;
     
     int width = 600, height = 378;
     
@@ -76,8 +76,8 @@ public class Flow {
         GL11.glEnd();
         
         sp.disable();
-        if(meep){
-            meep = false;
+        if(firstFrame){
+            firstFrame = false;
             logodump.enable();
             GL11.glBindTexture(GL_TEXTURE_RECTANGLE, 0);
             title.bind();

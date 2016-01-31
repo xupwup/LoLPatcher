@@ -21,7 +21,7 @@ void main(){
 			vec2 sample = texture(source, tex + vec2(i,j)).xy;
 			
 			float len = length(sample);
-			if(len > 0){
+			if(len > 0.0){
 				float factor = clamp(dot((sample / len), dir1), 0.0, 1.0);
 				factor = factor * factor;
 				
@@ -33,7 +33,7 @@ void main(){
 	
 	
 	vec2 sampleSelf = texture(source, tex).xy;
-	vec2 finalOut = sampleSelf * (1 - friction) + sumDir;
+	vec2 finalOut = sampleSelf * (1.0 - friction) + sumDir;
 	
 	
 	vec2 distToCursor = tex - cursor;
