@@ -52,7 +52,8 @@ public class Main extends GLFramework {
     PatchTask patcher;
     TextRenderer tr;
     TextRenderer smallText;
-    News news = new News();
+    public TextRenderer boldText;
+    Flow flow;
     public String airversion;
     long patcherStartTime;
     boolean ignoreS_OK = false, force = false;
@@ -127,15 +128,15 @@ public class Main extends GLFramework {
                 boolean autostart = ((CheckBox) c).checked;
                 Properties props = new Properties();
                 if(new File("settings.txt").exists()){
-                    try {
-                        props.load(new FileReader("settings.txt"));
+                    try (FileReader fr = new FileReader("settings.txt")){
+                        props.load(fr);
                     } catch (IOException ex) {
                         Logger.getLogger(Main.class.getName()).log(Level.SEVERE, null, ex);
                     }
                 }
                 props.setProperty("autostart", Boolean.toString(autostart));
-                try {
-                    props.store(new FileWriter("settings.txt"), null);
+                try (FileWriter fw = new FileWriter("settings.txt")){
+                    props.store(fw, null);
                 } catch (IOException ex) {
                     Logger.getLogger(Main.class.getName()).log(Level.SEVERE, null, ex);
                 }
@@ -155,10 +156,11 @@ public class Main extends GLFramework {
         tr = new TextRenderer(new Font("SansSerif", Font.PLAIN, 15), true);
         smallText = new TextRenderer(new Font("SansSerif", Font.PLAIN, 10), true);
         try {
-            news.get();
-            playw = news.bold.getWidth("PLAY");
-            repairw = news.bold.getWidth("Settings");
-            playh = news.bold.getHeight();
+            flow = new Flow(applicationBuffer);
+            boldText = new TextRenderer(new Font("SansSerif", Font.BOLD, 15), true);
+            playw = boldText.getWidth("PLAY");
+            repairw = boldText.getWidth("Settings");
+            playh = boldText.getHeight();
             playx = (float) ((windowSize.x/2) - playw/2) - 60;
             playy = (float) (windowSize.y - playh - 3);
         } catch (IOException ex) {
@@ -217,9 +219,8 @@ public class Main extends GLFramework {
         glMatrixMode(GL_MODELVIEW);
         glLoadIdentity();
         
+        int newsHeight = flow.draw(Mouse.isInsideWindow() ? Mouse.getX() : -10, (int) (windowSize.y - Mouse.getY()));
         
-        
-        int newsHeight = news.draw(Mouse.getX(), (int) (windowSize.y - Mouse.getY()), !wm.hitTest(Mouse.getX(), (int) (windowSize.y - Mouse.getY()))) + 5;
         glColor3f(1f, 1f, 1f);
         informationBackgroundTexture.bind();
         glBegin(GL_QUADS);
@@ -353,7 +354,7 @@ public class Main extends GLFramework {
                     glVertex2f(playx + playw + 3, playy - 4);
                 glEnd();
                 glColor3f(0, 0, 0);
-                news.bold.draw("PLAY", playx, playy);
+                boldText.draw("PLAY", playx, playy);
 
                 if(x > playx + 100 && x < playx + repairw + 100 &&
                         y > playy && y < playy + playh){
@@ -370,7 +371,7 @@ public class Main extends GLFramework {
                     glVertex2f(100 + playx + repairw + 3, playy - 4);
                 glEnd();
                 glColor3f(0, 0, 0);
-                news.bold.draw("Settings", 100 + playx, playy);
+                boldText.draw("Settings", 100 + playx, playy);
             }
         }
         
@@ -428,9 +429,9 @@ public class Main extends GLFramework {
     
     private boolean getAutoStart(){
         if(new File("settings.txt").exists()){
-            try {
+            try (FileReader fr = new FileReader("settings.txt")){
                 Properties props = new Properties();
-                props.load(new FileReader("settings.txt"));
+                props.load(fr);
                 return Boolean.parseBoolean(props.getProperty("autostart"));
             } catch (FileNotFoundException ex) {
                 Logger.getLogger(Main.class.getName()).log(Level.SEVERE, null, ex);
@@ -467,7 +468,7 @@ public class Main extends GLFramework {
                 wm.addWindow(repairWindow);
             }
         }
-        news.click(x, y);
+        //news.click(x, y);
     }
 
     @Override

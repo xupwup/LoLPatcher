@@ -20,25 +20,29 @@ public class FrameBuffer {
     
     int xsize;
     int ysize;
+    int textureType;
     
     
     public FrameBuffer(int xsize, int ysize){
+        this(xsize, ysize, GL_TEXTURE_2D, GL_RGBA8, GL_RGBA);
+    }
+    public FrameBuffer(int xsize, int ysize, int textureType, int type1, int type2){
         this.xsize = xsize;
         this.ysize = ysize;
         framebuffer = glGenFramebuffers();
         framebuffertex = glGenTextures();
         
         glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
-        glBindTexture(GL_TEXTURE_2D, framebuffertex);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, xsize, ysize, 0, GL_RGBA, GL_FLOAT, (ByteBuffer) null);
+        glBindTexture(textureType, framebuffertex);
+        glTexImage2D(textureType, 0, type1, xsize, ysize, 0, type2, GL_FLOAT, (ByteBuffer) null);
         
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(textureType, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glTexParameteri(textureType, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
         
         
-        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, framebuffertex, 0);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, textureType, framebuffertex, 0);
         
-        glDrawBuffers(framebuffer);
+        glDrawBuffers(GL_COLOR_ATTACHMENT0);
         
         glViewport(0, 0, xsize, ysize);
         glBindFramebuffer(GL_FRAMEBUFFER, 0);

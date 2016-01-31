@@ -7,7 +7,6 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.FileWriter;
-import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -40,35 +39,68 @@ public class ConfigurationTask extends PatchTask{
         this.main = main;
     }
     
+    
+    private void selectLanguage(final String server) throws IOException{
+        slnversion = LoLPatcher.getVersion("solutions", "lol_game_client_sln", server); // temporarily use EUW to get language list
+        String branch = (server.equals("PBE") ? "pbe" : "live");
+        getSolutionManifest(slnversion, branch);
+        File solutionmanifest = new java.io.File("RADS/solutions/lol_game_client_sln/releases/" + slnversion + "/solutionmanifest");
+        BufferedReader br = new BufferedReader(new FileReader(solutionmanifest));
+        String line;
+        final ArrayList<String> languages = new ArrayList<>();
+        while((line = br.readLine()) != null){
+            if(line.matches("lol_game_client_[a-z]+_[a-z]+")){
+                String nlang = line.substring("lol_game_client_".length());
+                boolean found = false;
+                for(String lang : languages){
+                    if(lang.equals(nlang)){
+                        found = true;
+                        break;
+                    }
+                }
+                if(!found){
+                    languages.add(nlang);
+                }
+            }
+        }
+        final Window languageSelector = new Window(new Point(50, 10), "Select language");
+        
+        final SelectList languagelist = new SelectList(
+                    languages.toArray(new String[languages.size()]), 2
+                    , null, null, 0);
+        languageSelector.addComponent(languagelist);
+        languageSelector.addComponent(new Button("Save", new Listener() {
+            @Override
+            public void click(Component c) {
+                main.wm.closeWindow(languageSelector);
+                language = languages.get(languagelist.selected);
+
+                Properties props = new Properties();
+                try {
+                    props.setProperty("server", server);
+                    props.setProperty("language", language);
+                    try(FileWriter fw = new FileWriter("settings.txt")){
+                        props.store(fw, null);
+                    }
+                } catch (IOException ex) {
+                    error = ex;
+                    Logger.getLogger(ConfigurationTask.class.getName()).log(Level.SEVERE, null, ex);
+                }
+                addPatchers();
+            }
+        } , null));
+        
+        main.wm.addWindow(languageSelector);
+    }
+    
     @Override
     public void patch() throws MalformedURLException, IOException, NoSuchAlgorithmException {
         if(! new File("settings.txt").exists()){
-            slnversion = LoLPatcher.getVersion("solutions", "lol_game_client_sln", "EUW"); // temporarily use EUW to get language list
-            getSolutionManifest(slnversion, "live");
-            File solutionmanifest = new java.io.File("RADS/solutions/lol_game_client_sln/releases/" + slnversion + "/solutionmanifest");
-            BufferedReader br = new BufferedReader(new FileReader(solutionmanifest));
-            String line;
-            final ArrayList<String> languages = new ArrayList<>();
-            while((line = br.readLine()) != null){
-                if(line.matches("lol_game_client_[a-z]+_[a-z]+")){
-                    String nlang = line.substring("lol_game_client_".length());
-                    boolean found = false;
-                    for(String lang : languages){
-                        if(lang.equals(nlang)){
-                            found = true;
-                            break;
-                        }
-                    }
-                    if(!found){
-                        languages.add(nlang);
-                    }
-                }
-            }
-            final Window languageSelector = new Window(new Point(50, 10), "Select language");
+            
             
             final Window serverSelector = new Window(new Point(70, 15), "Select server");
-            final String[] serversHuman = new String[]{"EUW", "EUNE", "BR", "NA", "PBE", "LAN", "LAS"};
-            final String[] serversActual = new String[]{"EUW", "EUNE", "BR", "NA", "PBE", "LA1", "LA2"};
+            final String[] serversHuman = new String[]{"EUW", "EUNE", "BR", "NA", "PBE", "LAN", "LAS", "JP"};
+            final String[] serversActual = new String[]{"EUW", "EUNE", "BR", "NA", "PBE", "LA1", "LA2", "JP"};
             final SelectList serverlist = new SelectList(
                     serversHuman, 1
                     , null, null, 0);
@@ -77,39 +109,22 @@ public class ConfigurationTask extends PatchTask{
                 @Override
                 public void click(Component c) {
                     main.wm.closeWindow(serverSelector);
-                    main.wm.addWindow(languageSelector);
                     server = serversActual[serverlist.selected];
+                    try {
+                        selectLanguage(server);
+                    } catch (IOException ex) {
+                        Logger.getLogger(ConfigurationTask.class.getName()).log(Level.SEVERE, null, ex);
+                        error = ex;
+                    }
                 }
             }, null));
-            
-            
-            final SelectList languagelist = new SelectList(
-                    languages.toArray(new String[languages.size()]), 2
-                    , null, null, 0);
-            languageSelector.addComponent(languagelist);
-            languageSelector.addComponent(new Button("Save", new Listener() {
-                @Override
-                public void click(Component c) {
-                    main.wm.closeWindow(languageSelector);
-                    language = languages.get(languagelist.selected);
-                    
-                    Properties props = new Properties();
-                    try {
-                        props.setProperty("server", server);
-                        props.setProperty("language", language);
-                        props.store(new FileWriter("settings.txt"), null);
-                    } catch (IOException ex) {
-                        error = ex;
-                        Logger.getLogger(ConfigurationTask.class.getName()).log(Level.SEVERE, null, ex);
-                    }
-                    addPatchers();
-                }
-            } , null));
             
             main.wm.addWindow(serverSelector);
         }else{
             Properties props = new Properties();
-            props.load(new FileReader("settings.txt"));
+            try(FileReader fr = new FileReader("settings.txt")){
+                props.load(fr);
+            }
             server = props.getProperty("server");
             language = props.getProperty("language");
             
