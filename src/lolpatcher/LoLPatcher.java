@@ -265,6 +265,7 @@ public class LoLPatcher extends PatchTask{
         for(RAFArchive a : archives.values()){
             a.close();
         }
+        archives.clear();
         
         managedFilesCleanup(mf);
         if(!done && error == null){

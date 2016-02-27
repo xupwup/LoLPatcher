@@ -32,7 +32,6 @@ public class ArchivePurgeTask extends PatchTask {
     }
     
     
-    
     @Override
     public void patch() throws MalformedURLException, IOException, NoSuchAlgorithmException {
         currentFile = "Reading manifest";
@@ -93,54 +92,55 @@ public class ArchivePurgeTask extends PatchTask {
         }
         File sourceRaf = new File(folder, archives[0]);
         File sourceRafDat = new File(folder, archives[0]+".dat");
-        RAFArchive source = new RAFArchive(sourceRaf, sourceRafDat);
-
-        File tempDir = new File(folder, "temp");
-        if(tempDir.exists()){
-            LoLPatcher.deleteDir(tempDir);
-        }
-        currentFile = ar.versionName;
-        long sum = 0;
-        for(RAFArchive.RafFile fi : source.fileList){
-            sum += fi.size;
-        }
-        if(source.datRaf.length() == sum && source.fileList.size() == ar.files.size()){
-            return; // only purge if file has gaps or contains unneeded files
-        }
         
+        int nFilesInTarget = 0;
         
-        tempDir.mkdir();
-        currentFile = "Loading " + ar.versionName;
-        RAFArchive target = new RAFArchive(folderName + "/temp/Archive_1.raf");
-
-        for(int i = 0; i < ar.files.size(); i++){
-            ManifestFile f = ar.files.get(i);
-            archivePercentage = (float) i / ar.files.size();
-            currentFile = f.name;
-            
-            try (InputStream in = source.readFile(f.path + f.name)) {
-                try(OutputStream os = target.writeFile(f.path + f.name, f)){
-                    byte[] buffer = new byte[1024];
-                    int r;
-                    while((r = in.read(buffer)) != -1){
-                        speedStat(r);
-                        if(done){
-                            System.out.println("exited archive purge task");
-                            return;
+        try (RAFArchive source = new RAFArchive(sourceRaf, sourceRafDat)) {
+            File tempDir = new File(folder, "temp");
+            if(tempDir.exists()){
+                LoLPatcher.deleteDir(tempDir);
+            }
+            currentFile = ar.versionName;
+            long sum = 0;
+            for(RAFArchive.RafFile fi : source.fileList){
+                sum += fi.size;
+            }
+            if(source.datRaf.length() == sum && source.fileList.size() == ar.files.size()){
+                return; // only purge if file has gaps or contains unneeded files
+            }
+            tempDir.mkdir();
+            currentFile = "Loading " + ar.versionName;
+            try (RAFArchive target = new RAFArchive(folderName + "/temp/Archive_1.raf")) {
+                for(int i = 0; i < ar.files.size(); i++){
+                    ManifestFile f = ar.files.get(i);
+                    archivePercentage = (float) i / ar.files.size();
+                    currentFile = f.name;
+                    nFilesInTarget++;
+                    
+                    try (InputStream in = source.readFile(f.path + f.name)) {
+                        try(OutputStream os = target.writeFile(f.path + f.name, f)){
+                            byte[] buffer = new byte[1024];
+                            int r;
+                            while((r = in.read(buffer)) != -1){
+                                speedStat(r);
+                                if(done){
+                                    System.out.println("exited archive purge task");
+                                    return;
+                                }
+                                os.write(buffer, 0, r);
+                            }
                         }
-                        os.write(buffer, 0, r);
+                    }
+                    int olen = source.dictionary.get(f.path + f.name).size;
+                    int nlen = target.dictionary.get(f.path + f.name).size;
+                    if(nlen != olen){
+                        throw new IOException("Size mismatch:" + nlen + " " + olen);
                     }
                 }
             }
-            int olen = source.dictionary.get(f.path + f.name).size;
-            int nlen = target.dictionary.get(f.path + f.name).size;
-            if(nlen != olen){
-                throw new IOException("Size mismatch:" + nlen + " " + olen);
-            }
         }
-        target.close();
-        source.close();
-        if(target.fileList.isEmpty()){
+        
+        if(nFilesInTarget == 0){
             LoLPatcher.deleteDir(folder);
         }else{
             if(!sourceRaf.delete()){
@@ -155,7 +155,7 @@ public class ArchivePurgeTask extends PatchTask {
             if(!new File(folderName + "/temp/Archive_1.raf.dat").renameTo(new File(folder,"Archive_1.raf.dat"))){
                 throw new IOException("Move failed for " + folderName + "temp/Archive_1.raf.dat");
             }
-                   
+            
             new File(folderName + "/temp/").delete();
         }
     }
@@ -164,5 +164,4 @@ public class ArchivePurgeTask extends PatchTask {
     public float getPercentage() {
         return 100 * (globalPercentage + archivePercentage / nArchives);
     }
-    
 }

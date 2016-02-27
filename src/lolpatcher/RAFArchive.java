@@ -23,14 +23,14 @@ import nl.xupwup.Util.FileSliceInputStream;
  *
  * @author Rick
  */
-public class RAFArchive {
+public class RAFArchive implements AutoCloseable{
     File raf;
     File datRaf;
     final RandomAccessFile out;
     boolean changed = false;
+    boolean closed = false;
     ArrayList<RafFile> fileList;
     HashMap<String, RafFile> dictionary;
-    final private ArrayList<RafFileOutputStream> rafFileOutputStreams = new ArrayList<>();
     
     public RAFArchive(String path) throws IOException{
         raf = new File(path);
@@ -161,10 +161,13 @@ public class RAFArchive {
     
     /**
      * Writes the .raf file itself
+     * @throws java.io.IOException
      */
+    @Override
     public void close() throws IOException{
         out.close();
         sync();
+        closed = true;
     }
     
     public void sync() throws IOException{
@@ -346,6 +349,15 @@ public class RAFArchive {
         public void close() throws IOException {
             rf.size = count;
             changed = true;
+        }
+    }
+
+    @Override
+    protected void finalize() throws Throwable {
+        super.finalize();
+
+        if(!closed){
+            throw new IllegalStateException("Raf file was not closed");
         }
     }
 }

@@ -30,8 +30,8 @@ public class ArchiveDownloadWorker extends Worker{
                 htc.throwExceptionWhenNot200 = true;
                 htc.setErrorHandler(defaultHttpErrorHandler);
                 
-                LoLPatcher.Archive task;
                 while(true){
+                    LoLPatcher.Archive task;
                     synchronized(patcher.archivesToPatch){
                         if(patcher.archivesToPatch.isEmpty() || patcher.done || patcher.error != null){
                             break;
@@ -40,7 +40,7 @@ public class ArchiveDownloadWorker extends Worker{
                     }
                     startTime = System.currentTimeMillis();
                     progress = 0;
-                    RAFArchive archive = patcher.getArchive(task.versionName);
+                    RAFArchive archive = patcher.getArchive(task.versionName); // this file is not closed here, the lolpatcher has to do that
                     for(int i = 0; i < task.files.size(); i++){
                         if(patcher.done || patcher.error != null){
                             break;
@@ -68,7 +68,6 @@ public class ArchiveDownloadWorker extends Worker{
                         downloadFileToArchive(file, htc, archive);
                         progress = (float) i / task.files.size();
                     }
-                    archive.close();
                     progress = 1;
                     startTime = -1;
                 }
