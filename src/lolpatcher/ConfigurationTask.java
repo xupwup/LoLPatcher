@@ -99,8 +99,8 @@ public class ConfigurationTask extends PatchTask{
             
             
             final Window serverSelector = new Window(new Point(70, 15), "Select server");
-            final String[] serversHuman = new String[]{"EUW", "EUNE", "BR", "NA", "PBE", "LAN", "LAS", "JP"};
-            final String[] serversActual = new String[]{"EUW", "EUNE", "BR", "NA", "PBE", "LA1", "LA2", "JP"};
+            final String[] serversHuman = new String[]{"EUW", "EUNE", "BR", "NA", "PBE", "LAN", "LAS", "JP", "OCE"};
+            final String[] serversActual = new String[]{"EUW", "EUNE", "BR", "NA", "PBE", "LA1", "LA2", "JP", "OC1"};
             final SelectList serverlist = new SelectList(
                     serversHuman, 1
                     , null, null, 0);
